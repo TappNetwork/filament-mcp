@@ -39,6 +39,15 @@ it('logs a tool error', function () {
     expect(Activity::query()->sole()->properties['outcome'])->toBe('error');
 });
 
+it('keeps the recorded tool and outcome when a tool adds details with the same keys', function () {
+    $token = $this->makeUser()->createToken('t', ['manage_reports'])->plainTextToken;
+
+    callTool('/mcp/reports', 'rename_report', [], $token);
+
+    expect(Activity::query()->sole()->properties->only(['tool', 'outcome', 'report'])->all())
+        ->toBe(['tool' => 'rename_report', 'outcome' => 'error', 'report' => 'missing']);
+});
+
 it('logs which catalog tools execute_tools ran', function () {
     $token = $this->makeUser()->createToken('t', ['count_stock'])->plainTextToken;
 

@@ -74,7 +74,7 @@ The token form then offers one "Manage reports" checkbox for both tools. The lab
 
 Tokens created without abilities (`['*']`) can call every tool. A signed-in browser session is let through, the way Sanctum treats first-party requests.
 
-For servers that use `ToolSearch`, each tool that `execute_tools` runs is checked against its own ability. `search_tools` and `execute_tools` stay listed.
+For servers that use `ToolSearch`, each tool that `execute_tools` runs is checked against its own ability. `search_tools` and `execute_tools` stay listed, and `search_tools` can still name tools the token isn't allowed to run.
 
 To offer abilities that aren't MCP tools, such as for your own API routes, list them in the config:
 
@@ -119,6 +119,8 @@ use Tapp\FilamentMcpTokens\Facades\McpAudit;
 
 McpAudit::with(['report_id' => $report->id]);
 ```
+
+Properties with the same names as the ones above are ignored, so a tool can't change what the entry says the call did. A tool that streams its response is logged as `streamed` before it runs, so properties it adds while streaming aren't recorded.
 
 Set `audit.enabled` to `false` to turn it off.
 

@@ -3,6 +3,7 @@
 namespace Tapp\FilamentMcpTokens\Audit;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -53,15 +54,16 @@ class ToolCallAudit
             $logger->causedBy($user);
         }
 
+        $facts = [
+            'token_id' => $token instanceof Model ? $token->getKey() : null,
+            'tool' => $tool,
+            'server' => $server,
+            'outcome' => $outcome,
+        ];
+
+        // What the call actually did wins over a tool's own details.
         $logger
-            ->withProperties([
-                'token_id' => $token instanceof Model ? $token->getKey() : null,
-                'tool' => $tool,
-                'server' => $server,
-                'outcome' => $outcome,
-                ...$properties,
-                ...$extra,
-            ])
+            ->withProperties([...$facts, ...Arr::except([...$properties, ...$extra], array_keys($facts))])
             ->log($tool);
     }
 }
