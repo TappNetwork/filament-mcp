@@ -1,0 +1,82 @@
+{
+    "name": "tapp/filament-mcp-tokens",
+    "description": "Sanctum API tokens for Laravel MCP servers in Filament: one ability per tool, per-server setup steps, enforcement and an optional audit log.",
+    "keywords": [
+        "laravel",
+        "filament",
+        "mcp",
+        "sanctum",
+        "tapp"
+    ],
+    "homepage": "https://github.com/TappNetwork/filament-mcp-tokens",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Tapp Network"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/TappNetwork/filament-sanctum",
+            "no-api": true
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "filament/filament": "^4.14||^5.9",
+        "illuminate/contracts": "^12.0||^13.0",
+        "laravel/mcp": "^1.0",
+        "laravel/sanctum": "^4.0",
+        "devtical/filament-sanctum": "^1.2"
+    },
+    "suggest": {
+        "spatie/laravel-activitylog": "Logs every MCP tool call made with a token."
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.14",
+        "nunomaduro/collision": "^8.1.1",
+        "orchestra/testbench": "^10.0||^11.0",
+        "pestphp/pest": "^3.0||^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0||^4.0",
+        "pestphp/pest-plugin-livewire": "^3.0||^4.0",
+        "phpstan/extension-installer": "^1.3||^2.0",
+        "spatie/laravel-activitylog": "^4.10||^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Tapp\\FilamentMcpTokens\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tapp\\FilamentMcpTokens\\Tests\\": "tests/"
+        },
+        "files": [
+            "tests/Helpers.php"
+        ]
+    },
+    "scripts": {
+        "analyse": "vendor/bin/phpstan analyse --configuration=phpstan.neon.dist",
+        "test": "vendor/bin/pest --no-coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Tapp\\FilamentMcpTokens\\FilamentMcpTokensServiceProvider"
+            ]
+        }
+    }
+}

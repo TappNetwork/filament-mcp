@@ -1,0 +1,136 @@
+<?php
+
+use Illuminate\Support\Facades\File;
+use Tapp\FilamentMcpTokens\Commands\InstallCommand;
+
+beforeEach(function () {
+    $this->sandbox = sys_get_temp_dir().'/mcp-tokens-install-'.uniqid();
+    File::ensureDirectoryExists($this->sandbox.'/app/Models');
+    File::ensureDirectoryExists($this->sandbox.'/app/Providers/Filament');
+
+    $class = 'InstallUser'.uniqid();
+    File::put($this->sandbox."/app/Models/{$class}.php", <<<PHP
+    <?php
+
+    namespace Sandbox\\Models;
+
+    use Illuminate\\Database\\Eloquent\\Factories\\HasFactory;
+    use Illuminate\\Foundation\\Auth\\User as Authenticatable;
+    use Illuminate\\Notifications\\Notifiable;
+
+    class {$class} extends Authenticatable
+    {
+        use HasFactory, Notifiable;
+
+        protected \$fillable = ['name'];
+    }
+
+    PHP);
+    require $this->sandbox."/app/Models/{$class}.php";
+    config()->set('auth.providers.users.model', "Sandbox\\Models\\{$class}");
+    $this->userFile = $this->sandbox."/app/Models/{$class}.php";
+
+    $this->panelFile = $this->sandbox.'/app/Providers/Filament/AdminPanelProvider.php';
+    File::put($this->panelFile, <<<'PHP'
+    <?php
+
+    namespace App\Providers\Filament;
+
+    use Filament\Panel;
+    use Filament\PanelProvider;
+
+    class AdminPanelProvider extends PanelProvider
+    {
+        public function panel(Panel $panel): Panel
+        {
+            return $panel
+                ->default()
+                ->id('admin')
+                ->path('admin');
+        }
+    }
+
+    PHP);
+
+    $this->app->useAppPath($this->sandbox.'/app');
+});
+
+afterEach(function () {
+    File::deleteDirectory($this->sandbox);
+    File::delete(config_path('filament-mcp-tokens.php'));
+    File::delete(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')));
+});
+
+it('sets up the token page in one command', function () {
+    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])
+        ->expectsOutputToContain('Reports Admin')
+        ->assertSuccessful();
+
+    expect(File::get($this->userFile))
+        ->toContain("use Laravel\\Sanctum\\HasApiTokens;\n")
+        ->toContain('use HasApiTokens, HasFactory, Notifiable;')
+        ->and(File::get($this->panelFile))
+        ->toContain("use Tapp\\FilamentMcpTokens\\FilamentMcpTokensPlugin;\n")
+        ->toContain("            ->id('admin')\n            ->plugin(FilamentMcpTokensPlugin::make())\n")
+        ->and(config_path('filament-mcp-tokens.php'))->toBeFile()
+        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
+});
+
+it('can run again without changing anything', function () {
+    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
+    $user = File::get($this->userFile);
+    $panel = File::get($this->panelFile);
+
+    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
+
+    expect(File::get($this->userFile))->toBe($user)
+        ->and(File::get($this->panelFile))->toBe($panel)
+        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
+});
+
+it('replaces an existing SanctumPlugin', function () {
+    $source = <<<'PHP'
+    <?php
+
+    namespace App\Providers\Filament;
+
+    use Devtical\Sanctum\SanctumPlugin;
+    use Filament\Panel;
+
+    class AdminPanelProvider
+    {
+        public function panel(Panel $panel): Panel
+        {
+            return $panel->id('admin')->plugin(SanctumPlugin::make());
+        }
+    }
+    PHP;
+
+    $patched = app(InstallCommand::class)->withPlugin($source, 'admin');
+
+    expect($patched)
+        ->toContain('->plugin(FilamentMcpTokensPlugin::make())')
+        ->toContain('use Tapp\FilamentMcpTokens\FilamentMcpTokensPlugin;')
+        ->not->toContain('SanctumPlugin;');
+});
+
+it('adds the trait to a model with no traits yet', function () {
+    $patched = app(InstallCommand::class)->withTrait(<<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+
+    class User extends Authenticatable
+    {
+        protected $guarded = [];
+    }
+    PHP);
+
+    expect($patched)->toContain("{\n    use HasApiTokens;\n\n    protected \$guarded = [];");
+});
+
+it('fails when the panel does not exist', function () {
+    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'missing', '--no-migrate' => true])->assertFailed();
+});
