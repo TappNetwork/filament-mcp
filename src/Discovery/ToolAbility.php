@@ -30,6 +30,14 @@ final class ToolAbility
         return $attribute->label ?? Str::headline($attribute->name);
     }
 
+    /**
+     * The label the tool's #[Ability] declares, if any.
+     */
+    public static function declaredLabel(Tool $tool): ?string
+    {
+        return self::attribute($tool)?->label;
+    }
+
     private static function attribute(Tool $tool): ?Ability
     {
         $attributes = (new ReflectionClass($tool))->getAttributes(Ability::class);

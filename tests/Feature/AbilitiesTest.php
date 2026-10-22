@@ -1,9 +1,12 @@
 <?php
 
 use Laravel\Mcp\Facades\Mcp;
+use Tapp\FilamentMcpTokens\Discovery\McpServer;
 use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
 use Tapp\FilamentMcpTokens\Pages\McpTokens;
 use Tapp\FilamentMcpTokens\Tests\Fixtures\GrowingServer;
+use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\DeleteReport;
+use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\RenameReport;
 use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\RestockItem;
 
 afterEach(fn () => GrowingServer::$added = []);
@@ -15,6 +18,12 @@ it('makes one ability per tool, sharing a declared group ability', function () {
         'count_stock' => 'Count Stock',
         'restock_item' => 'Restock Item',
     ]);
+});
+
+it('labels a group with the label one of its tools declares, whatever the tool order', function () {
+    $server = new McpServer('Reports', 'Reports', 'reports', 'mcp/reports', [new RenameReport, new DeleteReport]);
+
+    expect($server->abilities())->toBe(['manage_reports' => 'Manage reports']);
 });
 
 it('offers a tool added to a server as an ability with no config change', function () {

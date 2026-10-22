@@ -28,14 +28,24 @@ final class McpServer
     }
 
     /**
+     * A group's label comes from whichever of its tools declares one.
+     *
      * @return array<string, string> ability => label
      */
     public function abilities(): array
     {
         $abilities = [];
+        $declared = [];
 
         foreach ($this->tools as $tool) {
-            $abilities[ToolAbility::for($tool)] ??= ToolAbility::label($tool);
+            $ability = ToolAbility::for($tool);
+            $label = ToolAbility::declaredLabel($tool);
+
+            if ($label !== null && ! isset($declared[$ability])) {
+                $abilities[$ability] = $declared[$ability] = $label;
+            } else {
+                $abilities[$ability] ??= ToolAbility::label($tool);
+            }
         }
 
         return $abilities;

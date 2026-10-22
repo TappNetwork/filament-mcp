@@ -70,7 +70,7 @@ class RenameReport extends Tool
 }
 ```
 
-The token form then offers one "Manage reports" checkbox for both tools. Groups also let existing tokens keep working after you rename or split a tool.
+The token form then offers one "Manage reports" checkbox for both tools. The label only needs to be on one tool in the group. Without one, the label is the ability name in headline case. Groups also let existing tokens keep working after you rename or split a tool.
 
 Tokens created without abilities (`['*']`) can call every tool. A signed-in browser session is let through, the way Sanctum treats first-party requests.
 
