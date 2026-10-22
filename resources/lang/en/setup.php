@@ -5,7 +5,7 @@ return [
     'title' => 'API tokens',
     'attention' => 'Attention needed',
     'copy_now' => "Make sure to copy your new personal access token now. You won't be able to see it again!",
-    'step_1' => 'Step 1: Paste the install prompt into your agent',
+    'step_1' => 'Step 1: Paste the setup prompt into your agent',
     'step_2' => 'Step 2: Give your agent the token securely',
     'copy_prompt' => 'Copy setup prompt',
     'prompt_copied' => 'Prompt copied',

@@ -1,11 +1,31 @@
 <x-filament::page>
+    {{-- Plain CSS so the page looks right without a custom Filament theme. --}}
+    <style>
+        .fmt-section { margin-bottom: 1.5rem; }
+        .fmt-stack { display: flex; flex-direction: column; gap: 1rem; margin: 0; padding: 0; list-style: none; }
+        .fmt-stack-sm { gap: 0.5rem; }
+        .fmt-stack-lg { gap: 1.5rem; }
+        .fmt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+        .fmt-server-name { font-size: 1rem; font-weight: 600; color: var(--gray-950); }
+        .fmt-step-title { font-size: 0.875rem; font-weight: 500; color: var(--gray-950); }
+        .fmt-muted { font-size: 0.875rem; color: var(--gray-500); }
+        .fmt-prompt { max-height: 10rem; overflow-y: auto; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gray-600); background: var(--gray-50); box-shadow: 0 0 0 1px rgb(3 7 18 / 0.1); }
+        .fmt-note { display: flex; align-items: flex-start; gap: 0.375rem; font-size: 0.875rem; font-weight: 500; color: var(--warning-600); }
+        .fmt-note-icon { width: 1rem; height: 1rem; margin-top: 0.125rem; flex-shrink: 0; }
+        .fmt-error { font-size: 0.875rem; color: var(--danger-600); }
+        .dark .fmt-server-name, .dark .fmt-step-title { color: #fff; }
+        .dark .fmt-muted { color: var(--gray-400); }
+        .dark .fmt-prompt { color: var(--gray-300); background: rgb(255 255 255 / 0.05); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1); }
+        .dark .fmt-note { color: var(--warning-400); }
+        .dark .fmt-error { color: var(--danger-400); }
+    </style>
     @if (filled($plainTextToken))
         @php($setupSteps = $this->getSetupSteps())
 
         <x-filament::section
             icon="heroicon-o-exclamation-triangle"
             icon-color="warning"
-            class="mb-6"
+            class="fmt-section"
             wire:key="mcp-tokens-plain-text-token"
         >
             <x-slot name="heading">
@@ -17,7 +37,7 @@
             </x-slot>
 
             <div
-                class="mt-4 space-y-6"
+                class="fmt-stack fmt-stack-lg"
                 x-data="{
                     token: @js($plainTextToken),
                     async writeClipboard(text) {
@@ -46,18 +66,18 @@
             >
                 @forelse ($setupSteps as $server)
                     <div
-                        class="space-y-4"
+                        class="fmt-stack"
                         data-mcp-server="{{ $server['key'] }}"
                         wire:key="mcp-tokens-server-{{ $server['key'] }}"
                         x-data="{
                             setupPrompt: @js($server['prompt']),
                             mcpConfig: @js($server['config']),
                             promptCopied: false,
-                            promptCopyFailed: false,
+                            promptCopiedFailed: false,
                             copied: false,
-                            copyFailed: false,
+                            copiedFailed: false,
                             configCopied: false,
-                            configCopyFailed: false,
+                            configCopiedFailed: false,
                             timer: null,
                             async copyText(text, flag) {
                                 clearTimeout(this.timer)
@@ -73,30 +93,32 @@
                         }"
                     >
                         @if (count($setupSteps) > 1)
-                            <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $server['name'] }}</h3>
+                            <h3 class="fmt-server-name">{{ $server['name'] }}</h3>
                         @endif
 
-                        <ol class="space-y-4">
-                            <li class="space-y-2" data-setup-step="1">
-                                <p class="text-sm font-medium text-gray-950 dark:text-white">{{ __('filament-mcp-tokens::setup.step_1') }}</p>
+                        <ol class="fmt-stack fmt-steps">
+                            <li class="fmt-stack fmt-stack-sm" data-setup-step="1">
+                                <p class="fmt-step-title">{{ __('filament-mcp-tokens::setup.step_1') }}</p>
 
                                 <div
                                     data-setup-prompt
-                                    class="max-h-40 overflow-y-auto rounded-lg bg-gray-50 px-3 py-2 text-sm whitespace-pre-wrap break-words text-gray-600 ring-1 ring-gray-950/10 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10"
+                                    class="fmt-prompt"
                                 >{{ $server['prompt'] }}</div>
 
-                                <x-filament::button type="button" color="gray" x-on:click="copyText(setupPrompt, 'promptCopied')">
-                                    <span x-show="! promptCopied">{{ __('filament-mcp-tokens::setup.copy_prompt') }}</span>
-                                    <span x-cloak x-show="promptCopied">{{ __('filament-mcp-tokens::setup.prompt_copied') }}</span>
-                                </x-filament::button>
+                                <div class="fmt-row">
+                                    <x-filament::button type="button" color="gray" x-on:click="copyText(setupPrompt, 'promptCopied')">
+                                        <span x-show="! promptCopied">{{ __('filament-mcp-tokens::setup.copy_prompt') }}</span>
+                                        <span x-cloak x-show="promptCopied">{{ __('filament-mcp-tokens::setup.prompt_copied') }}</span>
+                                    </x-filament::button>
+                                </div>
 
-                                <p x-cloak x-show="promptCopiedFailed" role="status" class="text-sm text-danger-600 dark:text-danger-400">
+                                <p x-cloak x-show="promptCopiedFailed" role="status" class="fmt-error">
                                     {{ __('filament-mcp-tokens::setup.prompt_copy_failed') }}
                                 </p>
                             </li>
 
-                            <li class="space-y-2" data-setup-step="2">
-                                <p class="text-sm font-medium text-gray-950 dark:text-white">{{ __('filament-mcp-tokens::setup.step_2') }}</p>
+                            <li class="fmt-stack fmt-stack-sm" data-setup-step="2">
+                                <p class="fmt-step-title">{{ __('filament-mcp-tokens::setup.step_2') }}</p>
 
                                 <x-filament::input.wrapper>
                                     <x-filament::input
@@ -106,17 +128,17 @@
                                         spellcheck="false"
                                         x-bind:value="token"
                                         x-on:focus="$event.target.select()"
-                                        class="font-mono"
+                                        style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace"
                                     />
                                 </x-filament::input.wrapper>
 
-                                <div class="flex flex-wrap items-center gap-2">
+                                <div class="fmt-row">
                                     <x-filament::button type="button" color="gray" x-on:click="copyText(token, 'copied')">
                                         <span x-show="! copied">{{ __('filament-mcp-tokens::setup.copy_token') }}</span>
                                         <span x-cloak x-show="copied">{{ __('filament-mcp-tokens::setup.token_copied') }}</span>
                                     </x-filament::button>
 
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('filament-mcp-tokens::setup.or') }}</span>
+                                    <span class="fmt-muted">{{ __('filament-mcp-tokens::setup.or') }}</span>
 
                                     <x-filament::button type="button" color="gray" x-on:click="copyText(mcpConfig, 'configCopied')">
                                         <span x-show="! configCopied">{{ __('filament-mcp-tokens::setup.copy_config') }}</span>
@@ -124,24 +146,24 @@
                                     </x-filament::button>
                                 </div>
 
-                                <p role="note" class="flex items-start gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
-                                    <x-filament::icon icon="heroicon-m-exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
+                                <p role="note" class="fmt-note">
+                                    <x-filament::icon icon="heroicon-m-exclamation-triangle" class="fmt-note-icon" />
                                     <span>{{ __('filament-mcp-tokens::setup.sensitive') }}</span>
                                 </p>
 
-                                <p x-cloak x-show="copiedFailed" role="status" class="text-sm text-danger-600 dark:text-danger-400">
+                                <p x-cloak x-show="copiedFailed" role="status" class="fmt-error">
                                     {{ __('filament-mcp-tokens::setup.token_copy_failed') }}
                                 </p>
 
-                                <p x-cloak x-show="configCopiedFailed" role="status" class="text-sm text-danger-600 dark:text-danger-400">
+                                <p x-cloak x-show="configCopiedFailed" role="status" class="fmt-error">
                                     {{ __('filament-mcp-tokens::setup.config_copy_failed') }}
                                 </p>
                             </li>
                         </ol>
                     </div>
                 @empty
-                    <div class="space-y-2" data-setup-step="token" x-data="{ copied: false }">
-                        <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('filament-mcp-tokens::setup.no_servers') }}</p>
+                    <div class="fmt-stack fmt-stack-sm" data-setup-step="token" x-data="{ copied: false }">
+                        <p class="fmt-muted">{{ __('filament-mcp-tokens::setup.no_servers') }}</p>
 
                         <x-filament::input.wrapper>
                             <x-filament::input
@@ -151,18 +173,20 @@
                                 spellcheck="false"
                                 x-bind:value="token"
                                 x-on:focus="$event.target.select()"
-                                class="font-mono"
+                                style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace"
                             />
                         </x-filament::input.wrapper>
 
-                        <x-filament::button type="button" color="gray" x-on:click="copied = await writeClipboard(token)">
-                            <span x-show="! copied">{{ __('filament-mcp-tokens::setup.copy_token') }}</span>
-                            <span x-cloak x-show="copied">{{ __('filament-mcp-tokens::setup.token_copied') }}</span>
-                        </x-filament::button>
+                        <div class="fmt-row">
+                            <x-filament::button type="button" color="gray" x-on:click="copied = await writeClipboard(token)">
+                                <span x-show="! copied">{{ __('filament-mcp-tokens::setup.copy_token') }}</span>
+                                <span x-cloak x-show="copied">{{ __('filament-mcp-tokens::setup.token_copied') }}</span>
+                            </x-filament::button>
+                        </div>
                     </div>
                 @endforelse
 
-                <div data-setup-step-end>
+                <div class="fmt-row" data-setup-step-end>
                     <x-filament::button type="button" color="gray" wire:click="forgetPlainTextToken">
                         {{ __('filament-mcp-tokens::setup.hide') }}
                     </x-filament::button>
