@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Authorization;
+namespace Tapp\FilamentMcp\Authorization;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
@@ -10,9 +10,9 @@ use Laravel\Mcp\Server\Tools\ExecuteTools;
 use Laravel\Mcp\Server\Tools\SearchTools;
 use Laravel\Mcp\Server\Tools\ToolSearch;
 use Laravel\Mcp\Transport\JsonRpcRequest;
-use Tapp\FilamentMcpTokens\Discovery\McpServer;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\Discovery\ToolAbility;
+use Tapp\FilamentMcp\Discovery\McpServer;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Discovery\ToolAbility;
 
 /**
  * Decides which tools the current token may call on a discovered server.

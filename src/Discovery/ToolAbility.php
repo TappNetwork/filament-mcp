@@ -1,11 +1,11 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Discovery;
+namespace Tapp\FilamentMcp\Discovery;
 
 use Illuminate\Support\Str;
 use Laravel\Mcp\Server\Tool;
 use ReflectionClass;
-use Tapp\FilamentMcpTokens\Attributes\Ability;
+use Tapp\FilamentMcp\Attributes\Ability;
 
 final class ToolAbility
 {

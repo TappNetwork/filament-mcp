@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests\Fixtures\Tools;
+namespace Tapp\FilamentMcp\Tests\Fixtures\Tools;
 
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;

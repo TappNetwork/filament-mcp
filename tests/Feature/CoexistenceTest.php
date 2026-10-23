@@ -6,8 +6,8 @@ use Laravel\Mcp\Server\Methods\CallTool;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Transport\JsonRpcRequest;
 use Laravel\Mcp\Transport\JsonRpcResponse;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\LessonsServer;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Tests\Fixtures\LessonsServer;
 
 beforeEach(function () {
     Mcp::web('/mcp/lessons', LessonsServer::class)->middleware('auth:sanctum');
@@ -47,11 +47,4 @@ it('runs alongside a host decorator of tool calls', function () {
     callTool('/mcp/reports', 'list_reports', [], $token)->assertJsonPath('result.isError', true);
 
     expect($seen->getArrayCopy())->toBe(['list_lessons', 'list_reports']);
-});
-
-it('leaves the filament-sanctum config to the host', function () {
-    $defaults = require __DIR__.'/../../vendor/devtical/filament-sanctum/config/filament-sanctum.php';
-
-    expect(config('filament-sanctum'))->toBe($defaults)
-        ->and(config('filament-mcp-tokens.navigation.slug'))->toBe('api-tokens');
 });

@@ -1,13 +1,13 @@
 <?php
 
 use Laravel\Mcp\Facades\Mcp;
-use Tapp\FilamentMcpTokens\Discovery\McpServer;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\Pages\McpTokens;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\GrowingServer;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\DeleteReport;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\RenameReport;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\RestockItem;
+use Tapp\FilamentMcp\Discovery\McpServer;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Pages\McpTokens;
+use Tapp\FilamentMcp\Tests\Fixtures\GrowingServer;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\DeleteReport;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\RenameReport;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\RestockItem;
 
 afterEach(fn () => GrowingServer::$added = []);
 
@@ -42,7 +42,7 @@ it('offers a tool added to a server as an ability with no config change', functi
 });
 
 it('adds extra abilities from config for routes that are not MCP tools', function () {
-    config()->set('filament-mcp-tokens.abilities.extra', ['export_csv' => 'Export CSV']);
+    config()->set('filament-mcp.abilities.extra', ['export_csv' => 'Export CSV']);
 
     $page = new McpTokens;
     $options = (fn () => $this->getAbilityOptions())->call($page);

@@ -1,9 +1,9 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Facades;
+namespace Tapp\FilamentMcp\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use Tapp\FilamentMcpTokens\Audit\ToolCallAudit;
+use Tapp\FilamentMcp\Audit\ToolCallAudit;
 
 /**
  * Adds details to the audit log entry for the current tool call.

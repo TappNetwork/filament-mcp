@@ -1,11 +1,11 @@
 <?php
 
 use Laravel\Sanctum\Sanctum;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\PublicDocsServer;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\ReportsServer;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\CountStock;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\DeleteReport;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\ListReports;
+use Tapp\FilamentMcp\Tests\Fixtures\PublicDocsServer;
+use Tapp\FilamentMcp\Tests\Fixtures\ReportsServer;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\CountStock;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\DeleteReport;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\ListReports;
 
 it('runs a tool when the token has its ability', function () {
     $token = $this->makeUser()->createToken('t', ['list_reports'])->plainTextToken;

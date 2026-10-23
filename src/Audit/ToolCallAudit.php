@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Audit;
+namespace Tapp\FilamentMcp\Audit;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -41,14 +41,14 @@ class ToolCallAudit
         $extra = $this->properties;
         $this->properties = [];
 
-        if (! config('filament-mcp-tokens.audit.enabled', true) || ! static::available()) {
+        if (! config('filament-mcp.audit.enabled', true) || ! static::available()) {
             return;
         }
 
         $user = Auth::user();
         $token = $user !== null && method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
 
-        $logger = activity(config('filament-mcp-tokens.audit.log_name', 'mcp'));
+        $logger = activity(config('filament-mcp.audit.log_name', 'mcp'));
 
         if ($user instanceof Model) {
             $logger->causedBy($user);

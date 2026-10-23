@@ -1,6 +1,6 @@
 {
-    "name": "tapp/filament-mcp-tokens",
-    "description": "Sanctum API tokens for Laravel MCP servers in Filament: one ability per tool, per-server setup steps, enforcement and an optional audit log.",
+    "name": "tapp/filament-mcp",
+    "description": "MCP for Laravel apps in Filament: a token page with one Sanctum ability per tool, setup steps for any AI agent, tool-call enforcement and an optional audit log.",
     "keywords": [
         "laravel",
         "filament",
@@ -8,7 +8,7 @@
         "sanctum",
         "tapp"
     ],
-    "homepage": "https://github.com/TappNetwork/filament-mcp-tokens",
+    "homepage": "https://github.com/TappNetwork/filament-mcp",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -18,20 +18,12 @@
     ],
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/TappNetwork/filament-sanctum",
-            "no-api": true
-        }
-    ],
     "require": {
         "php": "^8.3",
         "filament/filament": "^4.14||^5.9",
         "illuminate/contracts": "^12.0||^13.0",
         "laravel/mcp": "^1.0",
-        "laravel/sanctum": "^4.0",
-        "devtical/filament-sanctum": "^1.2"
+        "laravel/sanctum": "^4.0"
     },
     "suggest": {
         "spatie/laravel-activitylog": "Logs every MCP tool call made with a token."
@@ -49,12 +41,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Tapp\\FilamentMcpTokens\\": "src/"
+            "Tapp\\FilamentMcp\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tapp\\FilamentMcpTokens\\Tests\\": "tests/"
+            "Tapp\\FilamentMcp\\Tests\\": "tests/"
         },
         "files": [
             "tests/Helpers.php"
@@ -75,7 +67,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Tapp\\FilamentMcpTokens\\FilamentMcpTokensServiceProvider"
+                "Tapp\\FilamentMcp\\FilamentMcpServiceProvider"
             ]
         }
     }

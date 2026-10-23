@@ -1,10 +1,10 @@
 <?php
 
 use Laravel\Mcp\Facades\Mcp;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\Pages\McpTokens;
-use Tapp\FilamentMcpTokens\Setup\SetupInstructions;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\LessonsServer;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Pages\McpTokens;
+use Tapp\FilamentMcp\Setup\SetupInstructions;
+use Tapp\FilamentMcp\Tests\Fixtures\LessonsServer;
 
 it('builds the setup prompt from the server name and route URL', function () {
     $server = app(McpServerRegistry::class)->find('Reports Admin');

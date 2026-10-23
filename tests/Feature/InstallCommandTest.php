@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\File;
-use Tapp\FilamentMcpTokens\Commands\InstallCommand;
+use Tapp\FilamentMcp\Commands\InstallCommand;
 
 beforeEach(function () {
     $this->sandbox = sys_get_temp_dir().'/mcp-tokens-install-'.uniqid();
@@ -57,12 +57,12 @@ beforeEach(function () {
 
 afterEach(function () {
     File::deleteDirectory($this->sandbox);
-    File::delete(config_path('filament-mcp-tokens.php'));
+    File::delete(config_path('filament-mcp.php'));
     File::delete(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')));
 });
 
 it('sets up the token page in one command', function () {
-    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
         ->expectsOutputToContain('Reports Admin')
         ->assertSuccessful();
 
@@ -70,18 +70,18 @@ it('sets up the token page in one command', function () {
         ->toContain("use Laravel\\Sanctum\\HasApiTokens;\n")
         ->toContain('use HasApiTokens, HasFactory, Notifiable;')
         ->and(File::get($this->panelFile))
-        ->toContain("use Tapp\\FilamentMcpTokens\\FilamentMcpTokensPlugin;\n")
-        ->toContain("            ->id('admin')\n            ->plugin(FilamentMcpTokensPlugin::make())\n")
-        ->and(config_path('filament-mcp-tokens.php'))->toBeFile()
+        ->toContain("use Tapp\\FilamentMcp\\FilamentMcpPlugin;\n")
+        ->toContain("            ->id('admin')\n            ->plugin(FilamentMcpPlugin::make())\n")
+        ->and(config_path('filament-mcp.php'))->toBeFile()
         ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
 });
 
 it('can run again without changing anything', function () {
-    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
     $user = File::get($this->userFile);
     $panel = File::get($this->panelFile);
 
-    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
 
     expect(File::get($this->userFile))->toBe($user)
         ->and(File::get($this->panelFile))->toBe($panel)
@@ -109,8 +109,8 @@ it('replaces an existing SanctumPlugin', function () {
     $patched = app(InstallCommand::class)->withPlugin($source, 'admin');
 
     expect($patched)
-        ->toContain('->plugin(FilamentMcpTokensPlugin::make())')
-        ->toContain('use Tapp\FilamentMcpTokens\FilamentMcpTokensPlugin;')
+        ->toContain('->plugin(FilamentMcpPlugin::make())')
+        ->toContain('use Tapp\FilamentMcp\FilamentMcpPlugin;')
         ->not->toContain('SanctumPlugin;');
 });
 
@@ -132,5 +132,5 @@ it('adds the trait to a model with no traits yet', function () {
 });
 
 it('fails when the panel does not exist', function () {
-    $this->artisan('filament-mcp-tokens:install', ['--panel' => 'missing', '--no-migrate' => true])->assertFailed();
+    $this->artisan('filament-mcp:install', ['--panel' => 'missing', '--no-migrate' => true])->assertFailed();
 });

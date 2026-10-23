@@ -1,10 +1,10 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests\Fixtures;
+namespace Tapp\FilamentMcp\Tests\Fixtures;
 
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Name;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\ListLessons;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\ListLessons;
 
 /** Stands in for a server another package (such as filament-lms) supplies. */
 #[Name('Lessons')]

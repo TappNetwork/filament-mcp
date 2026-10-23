@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Discovery;
+namespace Tapp\FilamentMcp\Discovery;
 
 use Closure;
 use Illuminate\Auth\Middleware\Authenticate;

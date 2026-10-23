@@ -1,8 +1,8 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Setup;
+namespace Tapp\FilamentMcp\Setup;
 
-use Tapp\FilamentMcpTokens\Discovery\McpServer;
+use Tapp\FilamentMcp\Discovery\McpServer;
 
 /**
  * The agent-neutral setup steps shown after a token is created.
@@ -14,7 +14,7 @@ class SetupInstructions
      */
     public function prompt(McpServer $server): string
     {
-        return __('filament-mcp-tokens::setup.prompt', [
+        return __('filament-mcp::setup.prompt', [
             'name' => $server->name,
             'url' => $server->url(),
         ]);

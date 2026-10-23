@@ -1,10 +1,10 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests\Fixtures;
+namespace Tapp\FilamentMcp\Tests\Fixtures;
 
 use Filament\Panel;
 use Filament\PanelProvider;
-use Tapp\FilamentMcpTokens\FilamentMcpTokensPlugin;
+use Tapp\FilamentMcp\FilamentMcpPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -14,6 +14,6 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->plugin(FilamentMcpTokensPlugin::make());
+            ->plugin(FilamentMcpPlugin::make());
     }
 }

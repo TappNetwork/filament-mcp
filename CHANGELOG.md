@@ -1,7 +1,7 @@
 # Changelog
 
-All notable changes to `filament-mcp-tokens` will be documented in this file.
+All notable changes to `filament-mcp` will be documented in this file.
 
 ## Unreleased
 
-- First release: a Filament token page for Sanctum-guarded MCP servers, with one ability per tool, ability groups, per-server setup steps, tool-call enforcement, an optional audit log and an install command.
+- First release: an MCP token page for Filament (token table, expiry, revoking and setup steps for any AI agent), one Sanctum ability per tool, ability groups, tool-call enforcement, an optional audit log and an install command.

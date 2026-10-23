@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Discovery;
+namespace Tapp\FilamentMcp\Discovery;
 
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Tool;

@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Authorization;
+namespace Tapp\FilamentMcp\Authorization;
 
 use Generator;
 use Laravel\Mcp\Server\Contracts\Errable;
@@ -9,7 +9,7 @@ use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tools\ExecuteTools;
 use Laravel\Mcp\Transport\JsonRpcRequest;
 use Laravel\Mcp\Transport\JsonRpcResponse;
-use Tapp\FilamentMcpTokens\Audit\ToolCallAudit;
+use Tapp\FilamentMcp\Audit\ToolCallAudit;
 use Throwable;
 
 /**

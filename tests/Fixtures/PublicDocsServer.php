@@ -1,10 +1,10 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests\Fixtures;
+namespace Tapp\FilamentMcp\Tests\Fixtures;
 
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Name;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\Tools\CountStock;
+use Tapp\FilamentMcp\Tests\Fixtures\Tools\CountStock;
 
 /** Not behind Sanctum, so the package leaves it alone. */
 #[Name('Public Docs')]

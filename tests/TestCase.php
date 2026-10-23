@@ -1,10 +1,9 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests;
+namespace Tapp\FilamentMcp\Tests;
 
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
-use Devtical\Sanctum\SanctumServiceProvider as FilamentSanctumServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\FilamentServiceProvider;
 use Filament\Forms\FormsServiceProvider;
@@ -23,12 +22,12 @@ use Laravel\Sanctum\SanctumServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Spatie\Activitylog\ActivitylogServiceProvider;
-use Tapp\FilamentMcpTokens\FilamentMcpTokensServiceProvider;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\AdminPanelProvider;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\PublicDocsServer;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\ReportsServer;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\User;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\WarehouseServer;
+use Tapp\FilamentMcp\FilamentMcpServiceProvider;
+use Tapp\FilamentMcp\Tests\Fixtures\AdminPanelProvider;
+use Tapp\FilamentMcp\Tests\Fixtures\PublicDocsServer;
+use Tapp\FilamentMcp\Tests\Fixtures\ReportsServer;
+use Tapp\FilamentMcp\Tests\Fixtures\User;
+use Tapp\FilamentMcp\Tests\Fixtures\WarehouseServer;
 
 abstract class TestCase extends Orchestra
 {
@@ -50,8 +49,7 @@ abstract class TestCase extends Orchestra
             SanctumServiceProvider::class,
             McpServiceProvider::class,
             ActivitylogServiceProvider::class,
-            FilamentSanctumServiceProvider::class,
-            FilamentMcpTokensServiceProvider::class,
+            FilamentMcpServiceProvider::class,
             AdminPanelProvider::class,
         ]));
     }

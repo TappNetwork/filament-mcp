@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Attributes;
+namespace Tapp\FilamentMcp\Attributes;
 
 use Attribute;
 

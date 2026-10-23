@@ -58,7 +58,7 @@ it('logs which catalog tools execute_tools ran', function () {
 });
 
 it('uses the configured log name', function () {
-    config()->set('filament-mcp-tokens.audit.log_name', 'metric_mcp');
+    config()->set('filament-mcp.audit.log_name', 'metric_mcp');
     $token = $this->makeUser()->createToken('t', ['list_reports'])->plainTextToken;
 
     callTool('/mcp/reports', 'list_reports', [], $token);
@@ -67,7 +67,7 @@ it('uses the configured log name', function () {
 });
 
 it('can be turned off', function () {
-    config()->set('filament-mcp-tokens.audit.enabled', false);
+    config()->set('filament-mcp.audit.enabled', false);
     $token = $this->makeUser()->createToken('t', ['list_reports'])->plainTextToken;
 
     callTool('/mcp/reports', 'list_reports', [], $token)->assertJsonPath('result.isError', false);

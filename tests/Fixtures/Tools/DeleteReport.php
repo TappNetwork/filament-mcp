@@ -1,12 +1,12 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Tests\Fixtures\Tools;
+namespace Tapp\FilamentMcp\Tests\Fixtures\Tools;
 
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
-use Tapp\FilamentMcpTokens\Attributes\Ability;
+use Tapp\FilamentMcp\Attributes\Ability;
 
 #[Name('delete_report')]
 #[Ability('manage_reports', label: 'Manage reports')]

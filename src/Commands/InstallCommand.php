@@ -1,6 +1,6 @@
 <?php
 
-namespace Tapp\FilamentMcpTokens\Commands;
+namespace Tapp\FilamentMcp\Commands;
 
 use Filament\Facades\Filament;
 use Filament\Panel;
@@ -8,12 +8,12 @@ use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Sanctum\HasApiTokens;
 use ReflectionClass;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\FilamentMcpTokensPlugin;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\FilamentMcpPlugin;
 
 class InstallCommand extends Command
 {
-    protected $signature = 'filament-mcp-tokens:install
+    protected $signature = 'filament-mcp:install
         {--panel= : The ID of the panel to add the API tokens page to}
         {--no-migrate : Publish the Sanctum migration without running it}';
 
@@ -36,14 +36,14 @@ class InstallCommand extends Command
 
     protected function publishConfig(): void
     {
-        if (file_exists(config_path('filament-mcp-tokens.php'))) {
+        if (file_exists(config_path('filament-mcp.php'))) {
             $this->components->twoColumnDetail('Config', 'already published');
 
             return;
         }
 
-        $this->callSilently('vendor:publish', ['--tag' => 'filament-mcp-tokens-config']);
-        $this->components->twoColumnDetail('Config', 'config/filament-mcp-tokens.php');
+        $this->callSilently('vendor:publish', ['--tag' => 'filament-mcp-config']);
+        $this->components->twoColumnDetail('Config', 'config/filament-mcp.php');
     }
 
     protected function publishSanctumMigration(Filesystem $files): void
@@ -135,14 +135,14 @@ class InstallCommand extends Command
         $path = $this->panelProviderPath($files, $panel);
 
         if ($path === null) {
-            $this->components->warn("Add FilamentMcpTokensPlugin::make() to the [{$panel->getId()}] panel.");
+            $this->components->warn("Add FilamentMcpPlugin::make() to the [{$panel->getId()}] panel.");
 
             return true;
         }
 
         $source = $files->get($path);
 
-        if (str_contains($source, 'FilamentMcpTokensPlugin')) {
+        if (str_contains($source, 'FilamentMcpPlugin')) {
             $this->components->twoColumnDetail('Panel plugin', "already on [{$panel->getId()}]");
 
             return true;
@@ -151,7 +151,7 @@ class InstallCommand extends Command
         $patched = $this->withPlugin($source, $panel->getId());
 
         if ($patched === null) {
-            $this->components->warn("Add FilamentMcpTokensPlugin::make() to the [{$panel->getId()}] panel.");
+            $this->components->warn("Add FilamentMcpPlugin::make() to the [{$panel->getId()}] panel.");
 
             return true;
         }
@@ -168,7 +168,7 @@ class InstallCommand extends Command
     public function withPlugin(string $source, string $panelId): ?string
     {
         if (str_contains($source, 'SanctumPlugin::make()')) {
-            $source = str_replace('SanctumPlugin::make()', 'FilamentMcpTokensPlugin::make()', $source);
+            $source = str_replace('SanctumPlugin::make()', 'FilamentMcpPlugin::make()', $source);
             $source = preg_replace('/^use Devtical\\\\Sanctum\\\\SanctumPlugin;\n/m', '', $source) ?? $source;
         } else {
             $pattern = '/^(\s*)->id\([\'"]'.preg_quote($panelId, '/').'[\'"]\)\n/m';
@@ -177,10 +177,10 @@ class InstallCommand extends Command
                 return null;
             }
 
-            $source = preg_replace($pattern, "\$0\$1->plugin(FilamentMcpTokensPlugin::make())\n", $source, 1);
+            $source = preg_replace($pattern, "\$0\$1->plugin(FilamentMcpPlugin::make())\n", $source, 1);
         }
 
-        return $this->withImport((string) $source, FilamentMcpTokensPlugin::class);
+        return $this->withImport((string) $source, FilamentMcpPlugin::class);
     }
 
     protected function withImport(string $source, string $class): ?string

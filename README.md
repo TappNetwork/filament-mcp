@@ -1,36 +1,47 @@
-# Filament MCP Tokens
+# Filament MCP
 
-A Filament page where users create Laravel Sanctum tokens for your app's MCP servers. After a user creates a token, the page shows the steps to connect an AI agent to it.
+MCP for Laravel apps with a Filament panel. Users create Laravel Sanctum tokens for your app's MCP servers on a Filament page, and after creating one they get the steps to connect any AI agent to it.
 
+- **A token page made for MCP.** Users name a token, pick its abilities and an expiry, and can see and revoke their tokens. The new token is shown once, in the response that created it.
 - **Abilities come from your tools.** Every tool on an MCP server behind `auth:sanctum` becomes a Sanctum ability. Add a tool to a server and it shows up on the token form. You don't maintain an ability list.
 - **Tokens only reach the tools they're allowed.** A tool call is refused when the token lacks that tool's ability, and `tools/list` only shows tools the token can call.
 - **Setup steps come from your routes.** The setup prompt and the JSON config use each server's name and URL, so they follow your routes.
 - **Optional audit log.** When [spatie/laravel-activitylog](https://github.com/spatie/laravel-activitylog) is installed, every tool call made with a token is logged.
 
-The page builds on [filament-sanctum](https://github.com/TappNetwork/filament-sanctum), so the token table, expiry and revoking work the way they do there.
-
 ## Installation
 
+Requires PHP 8.3+, Filament 4 or 5, [Laravel MCP](https://github.com/laravel/mcp) and [Laravel Sanctum](https://github.com/laravel/sanctum).
+
+Until the package is on Packagist, add the repository to your app's `composer.json`:
+
+```json
+"repositories": [
+    { "type": "vcs", "url": "https://github.com/TappNetwork/filament-mcp" }
+]
+```
+
+Then install it and run the install command:
+
 ```bash
-composer require tapp/filament-mcp-tokens
-php artisan filament-mcp-tokens:install
+composer require tapp/filament-mcp:dev-main
+php artisan filament-mcp:install
 ```
 
 The install command:
 
-1. Publishes `config/filament-mcp-tokens.php`.
+1. Publishes `config/filament-mcp.php`.
 2. Publishes and runs Sanctum's `personal_access_tokens` migration, unless it is already there. Pass `--no-migrate` to skip running it.
 3. Adds `Laravel\Sanctum\HasApiTokens` to your user model.
-4. Adds `FilamentMcpTokensPlugin` to your panel. If the panel already uses `SanctumPlugin`, it is replaced. Pass `--panel=<id>` when you have more than one panel.
+4. Adds `FilamentMcpPlugin` to your panel. If the panel uses `SanctumPlugin` from devtical/filament-sanctum, it is replaced and that package can be removed. Pass `--panel=<id>` when you have more than one panel.
 
 You can run it again safely. It skips any step that's already done.
 
 To add the plugin yourself:
 
 ```php
-use Tapp\FilamentMcpTokens\FilamentMcpTokensPlugin;
+use Tapp\FilamentMcp\FilamentMcpPlugin;
 
-$panel->plugin(FilamentMcpTokensPlugin::make());
+$panel->plugin(FilamentMcpPlugin::make());
 ```
 
 ## Registering MCP servers
@@ -55,7 +66,7 @@ To cover several tools with one ability, add the `Ability` attribute to them:
 
 ```php
 use Laravel\Mcp\Server\Tool;
-use Tapp\FilamentMcpTokens\Attributes\Ability;
+use Tapp\FilamentMcp\Attributes\Ability;
 
 #[Ability('manage_reports', label: 'Manage reports')]
 class DeleteReport extends Tool
@@ -98,10 +109,10 @@ The server name comes from the server's `#[Name]` attribute (or its `$name` prop
 To change the wording, publish the translations:
 
 ```bash
-php artisan vendor:publish --tag=filament-mcp-tokens-translations
+php artisan vendor:publish --tag=filament-mcp-translations
 ```
 
-To change the page itself, extend it and override `getSetupSteps()` or `getAbilityOptions()`, then return your page from a plugin that extends `FilamentMcpTokensPlugin`. You can also publish the view with `--tag=filament-mcp-tokens-views`.
+To change the page itself, extend it and override `getSetupSteps()` or `getAbilityOptions()`, then return your page from a plugin that extends `FilamentMcpPlugin`. You can also publish the view with `--tag=filament-mcp-views`.
 
 ## Audit log
 
@@ -115,7 +126,7 @@ When `spatie/laravel-activitylog` is installed, each tool call made with a token
 A tool can add its own properties to the entry:
 
 ```php
-use Tapp\FilamentMcpTokens\Facades\McpAudit;
+use Tapp\FilamentMcp\Facades\McpAudit;
 
 McpAudit::with(['report_id' => $report->id]);
 ```
@@ -126,14 +137,14 @@ Set `audit.enabled` to `false` to turn it off.
 
 ## Configuration
 
-`config/filament-mcp-tokens.php` controls the page:
+`config/filament-mcp.php` controls the page:
 
 - `navigation`: slug, icon, sidebar entry and user menu entry.
 - `authorization.gate`: a gate that decides who can manage tokens. The page and its menu entries are hidden from users the gate refuses.
 - `abilities`: form columns, expiry options and extra abilities.
 - `audit`: whether and where tool calls are logged.
 
-The package doesn't read or change `config/filament-sanctum.php`.
+Set `abilities.allow_expiration` to `false` to create tokens that never expire.
 
 ## Testing your tools
 

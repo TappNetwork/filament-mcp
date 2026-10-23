@@ -2,8 +2,8 @@
 
 use Illuminate\Routing\Router;
 use Laravel\Mcp\Facades\Mcp;
-use Tapp\FilamentMcpTokens\Discovery\McpServerRegistry;
-use Tapp\FilamentMcpTokens\Tests\Fixtures\LessonsServer;
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Tests\Fixtures\LessonsServer;
 
 it('finds only the servers the host put behind Sanctum', function () {
     $servers = app(McpServerRegistry::class)->servers();
