@@ -6,7 +6,6 @@ use Laravel\Mcp\Facades\Mcp;
 use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
 use Laravel\Passport\Token;
-use phpseclib4\Crypt\RSA;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Pages\McpTokens;
 use Tapp\FilamentMcp\Tests\Fixtures\PassportUser;
@@ -23,9 +22,8 @@ beforeEach(function () {
     }
 
     if (! is_file($directory.'/oauth-private.key')) {
-        $key = RSA::createKey(2048);
-        file_put_contents($directory.'/oauth-private.key', (string) $key);
-        file_put_contents($directory.'/oauth-public.key', (string) $key->getPublicKey());
+        Passport::loadKeysFrom($directory);
+        $this->artisan('passport:keys', ['--force' => true, '--length' => 2048])->assertSuccessful();
     }
 
     Passport::$validateKeyPermissions = false;
