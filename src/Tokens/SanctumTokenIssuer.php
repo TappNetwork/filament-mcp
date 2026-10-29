@@ -6,6 +6,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Sanctum\HasApiTokens;
 use RuntimeException;
 
 class SanctumTokenIssuer implements IssuesMcpTokens
@@ -22,6 +23,10 @@ class SanctumTokenIssuer implements IssuesMcpTokens
 
     public function issue(Authenticatable $user, string $name, array $abilities, ?CarbonInterface $expiresAt): string
     {
+        if (! trait_exists(HasApiTokens::class)) {
+            throw new RuntimeException('filament-mcp is set to the sanctum driver, but laravel/sanctum is not installed.');
+        }
+
         if (! method_exists($user, 'createToken')) {
             throw new RuntimeException('The user model must use Laravel\Sanctum\HasApiTokens.');
         }

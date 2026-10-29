@@ -10,7 +10,7 @@ MCP for Laravel apps with a Filament panel. Users create Laravel Sanctum tokens 
 
 ## Installation
 
-Requires PHP 8.3+, Filament 4 or 5, [Laravel MCP](https://github.com/laravel/mcp), and either [Laravel Sanctum](https://github.com/laravel/sanctum) (the default) or [Laravel Passport](https://github.com/laravel/passport). Pass `--driver=passport` to the install command when the app already uses Passport.
+Requires PHP 8.3+, Filament 4 or 5, and [Laravel MCP](https://github.com/laravel/mcp). Tokens use [Laravel Sanctum](https://github.com/laravel/sanctum) ^4 by default, which the app installs itself (`composer require laravel/sanctum`). To use [Laravel Passport](https://github.com/laravel/passport) instead, install Passport ^13, create a personal access client, and pass `--driver=passport`.
 
 Until the package is on Packagist, add the repository to your app's `composer.json`:
 
@@ -23,15 +23,23 @@ Until the package is on Packagist, add the repository to your app's `composer.js
 Then install it and run the install command:
 
 ```bash
-composer require tapp/filament-mcp:dev-main
+composer require laravel/sanctum tapp/filament-mcp:dev-main
 php artisan filament-mcp:install
+```
+
+For Passport ^13:
+
+```bash
+composer require laravel/passport:^13.0 tapp/filament-mcp:dev-main
+php artisan passport:client --personal
+php artisan filament-mcp:install --driver=passport
 ```
 
 The install command:
 
-1. Publishes `config/filament-mcp.php`.
-2. Publishes and runs Sanctum's `personal_access_tokens` migration, unless it is already there. Pass `--no-migrate` to skip running it.
-3. Adds `Laravel\Sanctum\HasApiTokens` to your user model.
+1. Publishes `config/filament-mcp.php`. With `--driver=passport`, it sets `auth.driver` to `passport` in that file.
+2. For Sanctum (the default): publishes and runs Sanctum's `personal_access_tokens` migration, unless it is already there. Pass `--no-migrate` to skip running it. Adds `Laravel\Sanctum\HasApiTokens` to your user model.
+3. For Passport: does not publish a migration or edit the user model. It tells you to add `Laravel\Passport\HasApiTokens` yourself, and it warns when `php artisan passport:client --personal` has not been run.
 4. Adds `FilamentMcpPlugin` to your panel. If the panel uses `SanctumPlugin` from devtical/filament-sanctum, it is replaced and that package can be removed. Pass `--panel=<id>` when you have more than one panel.
 
 You can run it again safely. It skips any step that's already done.
@@ -69,13 +77,19 @@ Sanctum is the default. To issue Passport personal access tokens instead, publis
 ],
 ```
 
-The user model must use `Laravel\Passport\HasApiTokens`. Do not also add Sanctum's `HasApiTokens`: the two traits define the same methods and cannot sit on one model. Register the MCP route with the Passport guard:
+Requires `laravel/passport` ^13. The user model must use `Laravel\Passport\HasApiTokens`. Do not also add Sanctum's `HasApiTokens`: the two traits define the same methods and cannot sit on one model. Create a personal access client if you have not already (`php artisan passport:client --personal`). Register the MCP route with the Passport guard:
 
 ```php
 Mcp::web('/mcp/admin', AdminServer::class)->middleware('auth:api');
 ```
 
-`guards` can list more than one guard, for example `['sanctum', 'api']`, so the token page knows about servers on either middleware. Creating a token still uses `driver`. Passport's `createToken()` has no expiry argument, so the page writes the chosen expiry onto the token after it is issued. Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. Revoking a Passport token sets `revoked` instead of deleting the row.
+`guards` can list more than one guard, for example `['sanctum', 'api']`, so the token page knows about servers on either middleware. Creating a token still uses `driver`. A guard such as `auth:web` can be listed too, but a session on that guard has no access token and tool calls are refused.
+
+Passport's `createToken()` has no per-token expiry argument. For a chosen date, the package sets `Passport::personalAccessTokensExpireIn` to that moment, issues the token, and restores the previous lifetime. The JWT `exp` claim and the token row's `expires_at` are that same moment. Passport rejects the bearer when `exp` has passed, and this package also refuses a call when the row's `expires_at` is already past.
+
+Passport cannot issue a token with no `exp`. Choosing "never", or turning expiry off, leaves Passport's personal access token lifetime in place: one year, unless the app has called `Passport::personalAccessTokensExpireIn`. The token row stores that same expiry, so the page shows the date instead of "never".
+
+Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. A token created with the `*` scope can call every tool. Passport already treats `*` as a defined scope, so it is not added to the app's scope list. `HasApiTokens::tokens()` already limits the list to clients for the user provider, and revoking a token sets `revoked` instead of deleting the row.
 
 ## Abilities
 
@@ -102,7 +116,7 @@ class RenameReport extends Tool
 
 The token form then offers one "Manage reports" checkbox for both tools. The label only needs to be on one tool in the group. Without one, the label is the ability name in headline case. Groups also let existing tokens keep working after you rename or split a tool.
 
-Tokens created without abilities (`['*']`) can call every tool. A signed-in browser session is let through, the way Sanctum treats first-party requests.
+Tokens created without abilities (`['*']`) can call every tool. A first-party Sanctum request is let through, because the `auth:sanctum` guard attaches a transient token that can call every tool. A signed-in user with no access token, including a session on `auth:web`, is refused.
 
 For servers that use `ToolSearch`, each tool that `execute_tools` runs is checked against its own ability. `search_tools` and `execute_tools` stay listed, and `search_tools` can still name tools the token isn't allowed to run.
 
@@ -170,15 +184,17 @@ Set `abilities.allow_expiration` to `false` to create tokens that never expire.
 Server tests run without a signed-in user, so abilities aren't checked. To test them, act as a user with a token:
 
 ```php
+use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
 
 Sanctum::actingAs($user, ['list_reports']);
+// Passport::actingAs($user, ['list_reports']);
 
 ReportsServer::tool(ListReports::class)->assertOk();
 ReportsServer::tool(DeleteReport::class)->assertHasErrors(['Token lacks ability manage_reports.']);
 ```
 
-A user signed in with `actingAs()` alone has no token and is refused, so use `Sanctum::actingAs()`.
+A user signed in with `actingAs()` alone has no token and is refused. Pass the abilities or scopes the call needs to `Sanctum::actingAs()` or `Passport::actingAs()`.
 
 ## Development
 

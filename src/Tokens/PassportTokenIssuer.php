@@ -3,16 +3,19 @@
 namespace Tapp\FilamentMcp\Tokens;
 
 use Carbon\CarbonInterface;
+use DateInterval;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Laravel\Passport\Passport;
 use RuntimeException;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 
 /**
  * Passport personal access tokens. createToken() has no per-token expiry argument,
- * so the chosen expiry is written onto the token row after it is issued.
+ * so the chosen lifetime is applied to Passport's personal access token TTL for
+ * that one call. The JWT exp and the token row then share it.
  */
 class PassportTokenIssuer extends SanctumTokenIssuer
 {
@@ -38,11 +41,17 @@ class PassportTokenIssuer extends SanctumTokenIssuer
 
         $this->registerScopes();
 
-        $result = $user->createToken($name, $abilities);
-        $token = $result->token;
+        $previous = Passport::$personalAccessTokensExpireIn;
 
-        if ($token instanceof Model) {
-            $token->forceFill(['expires_at' => $expiresAt])->save();
+        try {
+            if ($expiresAt !== null) {
+                $seconds = max(0, (int) ceil(Carbon::now()->diffInSeconds($expiresAt, absolute: false)));
+                Passport::personalAccessTokensExpireIn(new DateInterval('PT'.$seconds.'S'));
+            }
+
+            $result = $user->createToken($name, $abilities);
+        } finally {
+            Passport::$personalAccessTokensExpireIn = $previous;
         }
 
         return (string) $result->accessToken;
@@ -56,9 +65,6 @@ class PassportTokenIssuer extends SanctumTokenIssuer
 
         return $user->tokens()
             ->where('revoked', false)
-            ->whereHas('client', function (Builder $query): void {
-                $query->where('grant_types', 'like', '%personal_access%');
-            })
             ->getQuery();
     }
 
@@ -88,7 +94,9 @@ class PassportTokenIssuer extends SanctumTokenIssuer
     /**
      * Passport only issues scopes that the application has defined. Tool abilities are
      * those scopes, registered here so a token can be given the tools the user picked.
-     * Existing scopes are kept.
+     * Scopes the app already defined are kept. "*" is left unregistered: Passport
+     * already treats it as a defined scope, and a personal access token created
+     * with it can call every tool.
      */
     private function registerScopes(): void
     {
@@ -98,7 +106,7 @@ class PassportTokenIssuer extends SanctumTokenIssuer
             $defined[$scope->id] = $scope->description;
         }
 
-        $scopes = ['*' => 'All MCP tools'] + $defined + app(McpServerRegistry::class)->abilities();
+        $scopes = $defined + app(McpServerRegistry::class)->abilities();
 
         if ($scopes !== $defined) {
             Passport::tokensCan($scopes);
