@@ -63,6 +63,8 @@ afterEach(function () {
 });
 
 it('sets up the token page in one command', function () {
+    skipWithoutSanctum();
+
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
         ->expectsOutputToContain('Reports Admin')
         ->assertSuccessful();
@@ -110,6 +112,8 @@ it('reports a passport personal access client when one exists', function () {
 });
 
 it('rewrites auth.driver when the published line is quoted or spaced differently', function () {
+    skipWithoutSanctum();
+
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
 
     $path = config_path('filament-mcp.php');
@@ -125,6 +129,8 @@ it('rewrites auth.driver when the published line is quoted or spaced differently
 });
 
 it('can run again without changing anything', function () {
+    skipWithoutSanctum();
+
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
     $user = File::get($this->userFile);
     $panel = File::get($this->panelFile);

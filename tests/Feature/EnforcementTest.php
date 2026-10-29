@@ -2,6 +2,10 @@
 
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Sanctum\Sanctum;
+
+beforeEach(function () {
+    skipWithoutSanctum();
+});
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Tests\Fixtures\PublicDocsServer;
 use Tapp\FilamentMcp\Tests\Fixtures\ReportsServer;

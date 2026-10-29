@@ -19,6 +19,14 @@ use Tapp\FilamentMcp\Discovery\McpServerRegistry;
  */
 class PassportTokenIssuer extends SanctumTokenIssuer
 {
+    /**
+     * Scope added to every token this page issues. The list and revoke actions
+     * require it, so other OAuth grants are left alone. Tokens issued before
+     * this scope existed do not have it: they stay valid, but this page no
+     * longer lists or revokes them.
+     */
+    public const MARKER = 'filament-mcp';
+
     public function name(): string
     {
         return 'passport';
@@ -41,6 +49,9 @@ class PassportTokenIssuer extends SanctumTokenIssuer
 
         $this->registerScopes();
 
+        // The personal-access grant reads this static when its server is built.
+        // One process shares the static, so the swap is not safe under Swoole
+        // coroutine hooks or when two requests issue tokens at the same time.
         $previous = Passport::$personalAccessTokensExpireIn;
 
         try {
@@ -49,7 +60,7 @@ class PassportTokenIssuer extends SanctumTokenIssuer
                 Passport::personalAccessTokensExpireIn(new DateInterval('PT'.$seconds.'S'));
             }
 
-            $result = $user->createToken($name, $abilities);
+            $result = $user->createToken($name, $this->withMarker($abilities));
         } finally {
             Passport::$personalAccessTokensExpireIn = $previous;
         }
@@ -65,6 +76,7 @@ class PassportTokenIssuer extends SanctumTokenIssuer
 
         return $user->tokens()
             ->where('revoked', false)
+            ->whereJsonContains('scopes', self::MARKER)
             ->getQuery();
     }
 
@@ -72,11 +84,22 @@ class PassportTokenIssuer extends SanctumTokenIssuer
     {
         $scopes = $token->getAttribute('scopes');
 
-        return is_array($scopes) ? array_values($scopes) : [];
+        if (! is_array($scopes)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $scopes,
+            fn (mixed $scope): bool => $scope !== self::MARKER,
+        ));
     }
 
     public function revoke(Model $token): void
     {
+        if (! $this->issuedHere($token)) {
+            return;
+        }
+
         if (method_exists($token, 'revoke')) {
             $token->revoke();
 
@@ -106,10 +129,33 @@ class PassportTokenIssuer extends SanctumTokenIssuer
             $defined[$scope->id] = $scope->description;
         }
 
-        $scopes = $defined + app(McpServerRegistry::class)->abilities();
+        $scopes = $defined + [self::MARKER => 'Filament MCP token'] + app(McpServerRegistry::class)->abilities();
 
         if ($scopes !== $defined) {
             Passport::tokensCan($scopes);
         }
+    }
+
+    /**
+     * @param  list<string>  $abilities
+     * @return list<string>
+     */
+    private function withMarker(array $abilities): array
+    {
+        $abilities = array_values(array_filter(
+            $abilities,
+            fn (string $ability): bool => $ability !== self::MARKER,
+        ));
+
+        $abilities[] = self::MARKER;
+
+        return $abilities;
+    }
+
+    private function issuedHere(Model $token): bool
+    {
+        $scopes = $token->getAttribute('scopes');
+
+        return is_array($scopes) && in_array(self::MARKER, $scopes, true);
     }
 }

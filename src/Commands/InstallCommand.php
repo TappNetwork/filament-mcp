@@ -8,13 +8,14 @@ use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
-use Laravel\Sanctum\HasApiTokens;
 use ReflectionClass;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\FilamentMcpPlugin;
 
 class InstallCommand extends Command
 {
+    private const SANCTUM_API_TOKENS = 'Laravel\\Sanctum\\HasApiTokens';
+
     protected $signature = 'filament-mcp:install
         {--panel= : The ID of the panel to add the API tokens page to}
         {--driver=sanctum : Token driver: sanctum or passport}
@@ -34,7 +35,7 @@ class InstallCommand extends Command
         $registry = $this->laravel->make(McpServerRegistry::class);
 
         if ($driver === 'sanctum') {
-            if (! trait_exists(HasApiTokens::class)) {
+            if (! trait_exists(self::SANCTUM_API_TOKENS)) {
                 $this->components->error('laravel/sanctum is not installed. Install it, or rerun with --driver=passport.');
 
                 return self::FAILURE;
@@ -195,7 +196,7 @@ class InstallCommand extends Command
             return;
         }
 
-        if (in_array(HasApiTokens::class, class_uses_recursive($model), true)) {
+        if (in_array(self::SANCTUM_API_TOKENS, class_uses_recursive($model), true)) {
             $this->components->twoColumnDetail('HasApiTokens', 'already on '.class_basename($model));
 
             return;
@@ -240,7 +241,7 @@ class InstallCommand extends Command
             $body = "    use HasApiTokens;\n\n".$body;
         }
 
-        $head = $this->withImport(substr($source, 0, $bodyStart), HasApiTokens::class);
+        $head = $this->withImport(substr($source, 0, $bodyStart), self::SANCTUM_API_TOKENS);
 
         return $head === null ? null : $head.$body;
     }

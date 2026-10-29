@@ -87,9 +87,11 @@ Mcp::web('/mcp/admin', AdminServer::class)->middleware('auth:api');
 
 Passport's `createToken()` has no per-token expiry argument. For a chosen date, the package sets `Passport::personalAccessTokensExpireIn` to that moment, issues the token, and restores the previous lifetime. The JWT `exp` claim and the token row's `expires_at` are that same moment. Passport rejects the bearer when `exp` has passed, and this package also refuses a call when the row's `expires_at` is already past.
 
-Passport cannot issue a token with no `exp`. Choosing "never", or turning expiry off, leaves Passport's personal access token lifetime in place: one year, unless the app has called `Passport::personalAccessTokensExpireIn`. The token row stores that same expiry, so the page shows the date instead of "never".
+Passport cannot issue a token with no `exp`. Choosing "never", or turning expiry off, leaves Passport's personal access token lifetime in place: one year, unless the app has called `Passport::personalAccessTokensExpireIn`. The form labels that choice with the date it will actually expire. The token row stores that same expiry.
 
-Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. A token created with the `*` scope can call every tool. Passport already treats `*` as a defined scope, so it is not added to the app's scope list. `HasApiTokens::tokens()` already limits the list to clients for the user provider, and revoking a token sets `revoked` instead of deleting the row.
+Every token this page issues also gets a `filament-mcp` scope. The page lists and revokes only tokens that have it, so an authorization-code token or a personal access token created somewhere else is left alone, refresh token included. The scope is not shown as an ability. Tokens issued before this scope was added do not have it: they keep working until they expire or are revoked outside this page, and this page will not list or revoke them.
+
+Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. A token created with the `*` scope can call every tool. Passport already treats `*` as a defined scope, so it is not added to the app's scope list. Revoking a token sets `revoked` instead of deleting the row.
 
 ## Abilities
 

@@ -9,6 +9,8 @@ use Tapp\FilamentMcp\Pages\McpTokens;
 use function Pest\Livewire\livewire;
 
 beforeEach(function () {
+    skipWithoutSanctum();
+
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     $this->actingAs($this->user = $this->makeUser());
 });

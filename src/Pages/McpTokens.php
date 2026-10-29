@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Passport\Passport;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Setup\SetupInstructions;
 use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
@@ -311,9 +312,27 @@ class McpTokens extends Page implements HasTable
         }
 
         $options['custom'] = __('filament-mcp::tokens.custom');
-        $options['never'] = __('filament-mcp::tokens.no_expiration');
+        $options['never'] = $this->neverExpiresLabel();
 
         return $options;
+    }
+
+    /**
+     * Passport has no token that never expires. "Never" on this form keeps
+     * Passport's personal access token lifetime, one year unless the app set
+     * Passport::personalAccessTokensExpireIn.
+     */
+    protected function neverExpiresLabel(): string
+    {
+        if ($this->tokens()->name() !== 'passport' || ! class_exists(Passport::class)) {
+            return __('filament-mcp::tokens.no_expiration');
+        }
+
+        $interval = Passport::$personalAccessTokensExpireIn ?? new \DateInterval('P1Y');
+
+        return __('filament-mcp::tokens.passport_lifetime', [
+            'date' => now()->add($interval)->format('M j, Y'),
+        ]);
     }
 
     protected function getDefaultExpiration(): string

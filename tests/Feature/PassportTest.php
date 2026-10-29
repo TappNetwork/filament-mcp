@@ -1,6 +1,7 @@
 <?php
 
 use Filament\Facades\Filament;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Passport\ClientRepository;
@@ -11,6 +12,7 @@ use Tapp\FilamentMcp\Pages\McpTokens;
 use Tapp\FilamentMcp\Tests\Fixtures\PassportUser;
 use Tapp\FilamentMcp\Tests\Fixtures\ReportsServer;
 use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
+use Tapp\FilamentMcp\Tokens\PassportTokenIssuer;
 
 use function Pest\Livewire\livewire;
 
@@ -73,7 +75,8 @@ it('issues, lists, calls, revokes, and expires a scoped passport token', functio
 
     expect(jwtExpiry($plain))->toBeBetween(now()->addDays(7)->getTimestamp() - 5, now()->addDays(7)->getTimestamp() + 5)
         ->and(abs($token->expires_at->getTimestamp() - jwtExpiry($plain)))->toBeLessThan(2)
-        ->and($token->scopes)->toBe(['list_reports']);
+        ->and($token->scopes)->toBe(['list_reports', PassportTokenIssuer::MARKER])
+        ->and(app(IssuesMcpTokens::class)->abilities($token))->toBe(['list_reports']);
 
     livewire(McpTokens::class)
         ->assertCanSeeTableRecords([$token]);
@@ -116,6 +119,65 @@ it('issues, lists, calls, revokes, and expires a scoped passport token', functio
     passportCall('/mcp/passport', 'list_reports', [], $plain)->assertUnauthorized();
 });
 
+it('does not list or revoke oauth tokens this page did not issue', function () {
+    app(IssuesMcpTokens::class)->issue($this->user, 'Claude', ['list_reports'], now()->addDay());
+
+    $mcp = Token::query()->where('name', 'Claude')->sole();
+
+    $personal = $this->user->createToken('CI script', ['*'])->token;
+
+    $client = app(ClientRepository::class)->createAuthorizationCodeGrantClient('Third party', ['https://example.com/callback']);
+    $oauth = Passport::token()->forceCreate([
+        'id' => Str::random(40),
+        'user_id' => $this->user->getKey(),
+        'client_id' => $client->getKey(),
+        'name' => 'Third-party app',
+        'scopes' => ['read'],
+        'revoked' => false,
+        'expires_at' => now()->addDay(),
+    ]);
+    $refresh = Passport::refreshToken()->forceCreate([
+        'id' => Str::random(40),
+        'access_token_id' => $oauth->getKey(),
+        'revoked' => false,
+        'expires_at' => now()->addMonth(),
+    ]);
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mcp])
+        ->assertCanNotSeeTableRecords([$personal, $oauth]);
+
+    $issuer = app(IssuesMcpTokens::class);
+    $issuer->revoke($personal);
+    $issuer->revoke($oauth);
+
+    expect($personal->refresh()->revoked)->toBeFalse()
+        ->and($oauth->refresh()->revoked)->toBeFalse()
+        ->and($refresh->refresh()->revoked)->toBeFalse();
+
+    livewire(McpTokens::class)->callTableAction('revoke', $mcp);
+
+    expect($mcp->refresh()->revoked)->toBeTrue();
+});
+
+it('labels passport never with the personal access token lifetime', function () {
+    $this->freezeSecond();
+
+    $label = (fn () => $this->getExpirationOptions())->call(new McpTokens)['never'];
+
+    expect($label)->toBe(__('filament-mcp::tokens.passport_lifetime', [
+        'date' => now()->addYear()->format('M j, Y'),
+    ]));
+
+    Passport::$personalAccessTokensExpireIn = new DateInterval('P30D');
+
+    $label = (fn () => $this->getExpirationOptions())->call(new McpTokens)['never'];
+
+    expect($label)->toBe(__('filament-mcp::tokens.passport_lifetime', [
+        'date' => now()->addDays(30)->format('M j, Y'),
+    ]));
+});
+
 it('stores passport never as the configured lifetime on the jwt and the row', function () {
     Passport::$personalAccessTokensExpireIn = null;
 
@@ -132,7 +194,7 @@ it('stores passport never as the configured lifetime on the jwt and the row', fu
 it('lets a passport token with the star scope call every tool', function () {
     $plain = app(IssuesMcpTokens::class)->issue($this->user, 'All', ['*'], now()->addDay());
 
-    expect(Token::query()->where('name', 'All')->sole()->scopes)->toBe(['*']);
+    expect(Token::query()->where('name', 'All')->sole()->scopes)->toBe(['*', PassportTokenIssuer::MARKER]);
 
     passportCall('/mcp/passport', 'delete_report', [], $plain)
         ->assertJsonPath('result.content.0.text', 'deleted');

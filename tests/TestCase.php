@@ -52,7 +52,7 @@ abstract class TestCase extends Orchestra
             TablesServiceProvider::class,
             WidgetsServiceProvider::class,
             FilamentServiceProvider::class,
-            SanctumServiceProvider::class,
+            class_exists(SanctumServiceProvider::class) ? SanctumServiceProvider::class : null,
             class_exists(PassportServiceProvider::class) ? PassportServiceProvider::class : null,
             McpServiceProvider::class,
             ActivitylogServiceProvider::class,
