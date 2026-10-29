@@ -10,7 +10,7 @@ MCP for Laravel apps with a Filament panel. Users create Laravel Sanctum tokens 
 
 ## Installation
 
-Requires PHP 8.3+, Filament 4 or 5, [Laravel MCP](https://github.com/laravel/mcp) and [Laravel Sanctum](https://github.com/laravel/sanctum).
+Requires PHP 8.3+, Filament 4 or 5, [Laravel MCP](https://github.com/laravel/mcp), and either [Laravel Sanctum](https://github.com/laravel/sanctum) (the default) or [Laravel Passport](https://github.com/laravel/passport). Pass `--driver=passport` to the install command when the app already uses Passport.
 
 Until the package is on Packagist, add the repository to your app's `composer.json`:
 
@@ -46,7 +46,7 @@ $panel->plugin(FilamentMcpPlugin::make());
 
 ## Registering MCP servers
 
-Your app registers its own servers with [Laravel MCP](https://github.com/laravel/mcp). The package finds every web server behind the Sanctum guard:
+Your app registers its own servers with [Laravel MCP](https://github.com/laravel/mcp). The package finds every web server behind the guard configured in `filament-mcp.auth.guards` (Sanctum's `auth:sanctum` by default):
 
 ```php
 // routes/ai.php
@@ -56,7 +56,26 @@ use Laravel\Mcp\Facades\Mcp;
 Mcp::web('/mcp/reports', ReportsServer::class)->middleware('auth:sanctum');
 ```
 
-The package never registers a server itself. It leaves alone any server without `auth:sanctum`, and local servers (`Mcp::local`).
+The package never registers a server itself. It leaves alone any server that is not behind a configured guard, and local servers (`Mcp::local`).
+
+## Passport
+
+Sanctum is the default. To issue Passport personal access tokens instead, publish the config (or pass `--driver=passport` to the install command) and set:
+
+```php
+'auth' => [
+    'driver' => 'passport',
+    'guards' => null, // null means the api guard
+],
+```
+
+The user model must use `Laravel\Passport\HasApiTokens`. Do not also add Sanctum's `HasApiTokens`: the two traits define the same methods and cannot sit on one model. Register the MCP route with the Passport guard:
+
+```php
+Mcp::web('/mcp/admin', AdminServer::class)->middleware('auth:api');
+```
+
+`guards` can list more than one guard, for example `['sanctum', 'api']`, so the token page knows about servers on either middleware. Creating a token still uses `driver`. Passport's `createToken()` has no expiry argument, so the page writes the chosen expiry onto the token after it is issued. Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. Revoking a Passport token sets `revoked` instead of deleting the row.
 
 ## Abilities
 

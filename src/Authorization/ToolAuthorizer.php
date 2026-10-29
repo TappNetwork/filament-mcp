@@ -45,9 +45,19 @@ class ToolAuthorizer
     {
         $user = Auth::user();
 
-        return $user !== null
-            && method_exists($user, 'tokenCan')
-            && $user->tokenCan($ability);
+        if ($user === null || ! method_exists($user, 'tokenCan')) {
+            return false;
+        }
+
+        // A signed-in session has no personal access token until a guard attaches one.
+        // Sanctum attaches a transient token for browser sessions, and Passport attaches
+        // the bearer token. Ability checks apply only once a token is present, so an
+        // in-process caller with no token is not treated as a token that has no abilities.
+        if (method_exists($user, 'currentAccessToken') && $user->currentAccessToken() === null) {
+            return true;
+        }
+
+        return $user->tokenCan($ability);
     }
 
     /**

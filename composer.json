@@ -26,10 +26,12 @@
         "laravel/sanctum": "^4.0"
     },
     "suggest": {
+        "laravel/passport": "Use Passport personal access tokens instead of Sanctum. Set filament-mcp.auth.driver to passport.",
         "spatie/laravel-activitylog": "Logs every MCP tool call made with a token."
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
+        "laravel/passport": "^13.0",
         "laravel/pint": "^1.14",
         "nunomaduro/collision": "^8.1.1",
         "orchestra/testbench": "^10.0||^11.0",

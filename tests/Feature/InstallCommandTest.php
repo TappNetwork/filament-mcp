@@ -76,6 +76,20 @@ it('sets up the token page in one command', function () {
         ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
 });
 
+it('installs the passport driver without adding Sanctum', function () {
+    $before = File::get($this->userFile);
+
+    $this->artisan('filament-mcp:install', [
+        '--panel' => 'admin',
+        '--driver' => 'passport',
+        '--no-migrate' => true,
+    ])->assertSuccessful();
+
+    expect(File::get($this->userFile))->toBe($before)
+        ->and(File::get(config_path('filament-mcp.php')))->toContain("'driver' => 'passport'")
+        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(0);
+});
+
 it('can run again without changing anything', function () {
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
     $user = File::get($this->userFile);

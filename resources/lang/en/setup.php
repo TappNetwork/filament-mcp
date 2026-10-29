@@ -18,6 +18,6 @@ return [
     'config_copy_failed' => "Couldn't copy the JSON config. Allow clipboard access and try again.",
     'token_copy_failed' => "Couldn't copy the token. Select it and copy it yourself.",
     'sensitive' => "Contains your sensitive token. Don't paste it into a chat prompt. Use your agent's secure input or add it to your MCP config file.",
-    'no_servers' => 'No MCP server uses Sanctum tokens yet. Copy the token now.',
+    'no_servers' => 'No MCP server uses these tokens yet. Copy the token now.',
     'hide' => 'Hide token',
 ];

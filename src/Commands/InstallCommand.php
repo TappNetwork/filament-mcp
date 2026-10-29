@@ -15,15 +15,29 @@ class InstallCommand extends Command
 {
     protected $signature = 'filament-mcp:install
         {--panel= : The ID of the panel to add the API tokens page to}
+        {--driver=sanctum : Token driver: sanctum or passport}
         {--no-migrate : Publish the Sanctum migration without running it}';
 
-    protected $description = 'Set up Sanctum API tokens for your MCP servers in a Filament panel';
+    protected $description = 'Set up API tokens for your MCP servers in a Filament panel';
 
-    public function handle(Filesystem $files, McpServerRegistry $registry): int
+    public function handle(Filesystem $files): int
     {
+        $driver = $this->driver();
+
         $this->publishConfig();
-        $this->publishSanctumMigration($files);
-        $this->addTraitToUserModel($files);
+        $this->selectDriver($driver, $files);
+
+        // Resolve after the driver is selected. The registry keeps the issuer
+        // it was given, and that issuer is chosen from the driver config.
+        $registry = $this->laravel->make(McpServerRegistry::class);
+
+        if ($driver === 'sanctum') {
+            $this->publishSanctumMigration($files);
+            $this->addTraitToUserModel($files);
+        } else {
+            $this->components->twoColumnDetail('Passport', 'using oauth personal access tokens');
+            $this->components->warn('The user model must use Laravel\\Passport\\HasApiTokens. This command does not add it.');
+        }
 
         if (! $this->addPluginToPanel($files)) {
             return self::FAILURE;
@@ -44,6 +58,38 @@ class InstallCommand extends Command
 
         $this->callSilently('vendor:publish', ['--tag' => 'filament-mcp-config']);
         $this->components->twoColumnDetail('Config', 'config/filament-mcp.php');
+    }
+
+    protected function driver(): string
+    {
+        $driver = $this->option('driver');
+
+        if (! is_string($driver) || ! in_array($driver, ['sanctum', 'passport'], true)) {
+            throw new \InvalidArgumentException('The --driver option must be sanctum or passport.');
+        }
+
+        return $driver;
+    }
+
+    /**
+     * Writes the chosen driver into the published config and the running app.
+     */
+    protected function selectDriver(string $driver, Filesystem $files): void
+    {
+        config(['filament-mcp.auth.driver' => $driver]);
+
+        $path = config_path('filament-mcp.php');
+
+        if ($driver === 'sanctum' || ! $files->exists($path)) {
+            return;
+        }
+
+        $source = $files->get($path);
+        $patched = preg_replace("/'driver' => 'sanctum'/", "'driver' => 'passport'", $source, 1);
+
+        if (is_string($patched) && $patched !== $source) {
+            $files->put($path, $patched);
+        }
     }
 
     protected function publishSanctumMigration(Filesystem $files): void
@@ -244,8 +290,9 @@ class InstallCommand extends Command
         $servers = $registry->servers();
 
         if ($servers === []) {
-            $this->components->info('Done. No MCP server uses Sanctum yet. Register one in routes/ai.php:');
-            $this->line("    Mcp::web('/mcp/app', AppServer::class)->middleware('auth:sanctum');");
+            $guard = config('filament-mcp.auth.driver') === 'passport' ? 'api' : 'sanctum';
+            $this->components->info("Done. No MCP server uses the {$guard} guard yet. Register one in routes/ai.php:");
+            $this->line("    Mcp::web('/mcp/app', AppServer::class)->middleware('auth:{$guard}');");
 
             return;
         }

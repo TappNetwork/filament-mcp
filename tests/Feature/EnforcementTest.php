@@ -91,6 +91,12 @@ it('does not guard a server test with no signed-in user', function () {
     PublicDocsServer::tool(CountStock::class)->assertSee('42');
 });
 
+it('lets a signed-in user with no access token call tools', function () {
+    $this->actingAs($this->makeUser());
+
+    ReportsServer::tool(DeleteReport::class)->assertOk()->assertSee('deleted');
+});
+
 it('lets a signed-in browser session call tools, like Sanctum does for first-party requests', function () {
     $this->actingAs($this->makeUser(), 'web');
 
