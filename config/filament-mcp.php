@@ -34,9 +34,10 @@ return [
     | Which personal-access-token system creates the tokens on the Filament
     | page and which route guards mark an MCP server as managed here.
     |
-    | driver: "sanctum" (default) or "passport". An app uses one driver. The
-    | user model can use Sanctum's HasApiTokens or Passport's, not both,
-    | because the two traits define the same methods.
+    | driver: "sanctum" (default) or "passport". An app uses one driver.
+    | Sanctum (^4) and Passport (^13) are installed separately; this package
+    | requires neither. The user model can use Sanctum's HasApiTokens or
+    | Passport's, not both, because the two traits define the same methods.
     |
     | guards: auth guards this package looks for on MCP routes. Null uses the
     | driver default (sanctum => ["sanctum"], passport => ["api"]). Set both,

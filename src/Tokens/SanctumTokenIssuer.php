@@ -10,6 +10,8 @@ use RuntimeException;
 
 class SanctumTokenIssuer implements IssuesMcpTokens
 {
+    private const SANCTUM_API_TOKENS = 'Laravel\\Sanctum\\HasApiTokens';
+
     public function name(): string
     {
         return 'sanctum';
@@ -22,6 +24,10 @@ class SanctumTokenIssuer implements IssuesMcpTokens
 
     public function issue(Authenticatable $user, string $name, array $abilities, ?CarbonInterface $expiresAt): string
     {
+        if (! trait_exists(self::SANCTUM_API_TOKENS)) {
+            throw new RuntimeException('filament-mcp is set to the sanctum driver, but laravel/sanctum is not installed.');
+        }
+
         if (! method_exists($user, 'createToken')) {
             throw new RuntimeException('The user model must use Laravel\Sanctum\HasApiTokens.');
         }

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Laravel\Passport\ClientRepository;
 use Tapp\FilamentMcp\Commands\InstallCommand;
 
 beforeEach(function () {
@@ -62,6 +63,8 @@ afterEach(function () {
 });
 
 it('sets up the token page in one command', function () {
+    skipWithoutSanctum();
+
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
         ->expectsOutputToContain('Reports Admin')
         ->assertSuccessful();
@@ -83,14 +86,51 @@ it('installs the passport driver without adding Sanctum', function () {
         '--panel' => 'admin',
         '--driver' => 'passport',
         '--no-migrate' => true,
-    ])->assertSuccessful();
+    ])->expectsOutputToContain('php artisan passport:client --personal')
+        ->assertSuccessful();
 
     expect(File::get($this->userFile))->toBe($before)
         ->and(File::get(config_path('filament-mcp.php')))->toContain("'driver' => 'passport'")
         ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(0);
 });
 
+it('reports a passport personal access client when one exists', function () {
+    $this->artisan('migrate', [
+        '--path' => realpath(__DIR__.'/../../vendor/laravel/passport/database/migrations'),
+        '--realpath' => true,
+    ])->assertSuccessful();
+
+    app(ClientRepository::class)->createPersonalAccessGrantClient('MCP tests');
+
+    $this->artisan('filament-mcp:install', [
+        '--panel' => 'admin',
+        '--driver' => 'passport',
+        '--no-migrate' => true,
+    ])->expectsOutputToContain('Personal access client')
+        ->doesntExpectOutputToContain('passport:client --personal')
+        ->assertSuccessful();
+});
+
+it('rewrites auth.driver when the published line is quoted or spaced differently', function () {
+    skipWithoutSanctum();
+
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
+
+    $path = config_path('filament-mcp.php');
+    File::put($path, str_replace("'driver' => 'sanctum'", '"driver"  =>  "sanctum"', File::get($path)));
+
+    $this->artisan('filament-mcp:install', [
+        '--panel' => 'admin',
+        '--driver' => 'passport',
+        '--no-migrate' => true,
+    ])->assertSuccessful();
+
+    expect(File::get($path))->toMatch('/(["\'])driver\1\s*=>\s*\'passport\'/');
+});
+
 it('can run again without changing anything', function () {
+    skipWithoutSanctum();
+
     $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])->assertSuccessful();
     $user = File::get($this->userFile);
     $panel = File::get($this->panelFile);

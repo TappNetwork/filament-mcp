@@ -16,6 +16,7 @@ return [
     'days' => ':days days (:date)',
     'custom' => 'Custom',
     'no_expiration' => 'No expiration',
+    'passport_lifetime' => 'Passport lifetime (:date)',
     'details' => 'Details',
     'revoke' => 'Revoke',
 ];

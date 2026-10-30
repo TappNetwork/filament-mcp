@@ -49,3 +49,30 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/pest --ci
+
+  no-sanctum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: no-sanctum
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies without Sanctum
+        run: |
+          composer update --prefer-dist --no-interaction
+          composer remove laravel/sanctum --dev --no-interaction
+
+      - name: Execute tests
+        run: vendor/bin/pest --ci
+
+      - name: Run PHPStan
+        run: vendor/bin/phpstan --error-format=github

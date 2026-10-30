@@ -10,6 +10,8 @@ use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Tests\Fixtures\LessonsServer;
 
 beforeEach(function () {
+    skipWithoutSanctum();
+
     Mcp::web('/mcp/lessons', LessonsServer::class)->middleware('auth:sanctum');
     app(McpServerRegistry::class)->flush();
 });

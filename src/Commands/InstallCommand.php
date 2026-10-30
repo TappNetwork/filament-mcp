@@ -6,13 +6,16 @@ use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Passport\Client;
+use Laravel\Passport\Passport;
 use ReflectionClass;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\FilamentMcpPlugin;
 
 class InstallCommand extends Command
 {
+    private const SANCTUM_API_TOKENS = 'Laravel\\Sanctum\\HasApiTokens';
+
     protected $signature = 'filament-mcp:install
         {--panel= : The ID of the panel to add the API tokens page to}
         {--driver=sanctum : Token driver: sanctum or passport}
@@ -32,11 +35,24 @@ class InstallCommand extends Command
         $registry = $this->laravel->make(McpServerRegistry::class);
 
         if ($driver === 'sanctum') {
+            if (! trait_exists(self::SANCTUM_API_TOKENS)) {
+                $this->components->error('laravel/sanctum is not installed. Install it, or rerun with --driver=passport.');
+
+                return self::FAILURE;
+            }
+
             $this->publishSanctumMigration($files);
             $this->addTraitToUserModel($files);
         } else {
+            if (! class_exists(Passport::class)) {
+                $this->components->error('laravel/passport is not installed. Install laravel/passport ^13, or rerun without --driver=passport.');
+
+                return self::FAILURE;
+            }
+
             $this->components->twoColumnDetail('Passport', 'using oauth personal access tokens');
             $this->components->warn('The user model must use Laravel\\Passport\\HasApiTokens. This command does not add it.');
+            $this->reportPersonalAccessClient();
         }
 
         if (! $this->addPluginToPanel($files)) {
@@ -85,11 +101,73 @@ class InstallCommand extends Command
         }
 
         $source = $files->get($path);
-        $patched = preg_replace("/'driver' => 'sanctum'/", "'driver' => 'passport'", $source, 1);
+        $current = $this->configuredAuthDriver($source);
 
-        if (is_string($patched) && $patched !== $source) {
-            $files->put($path, $patched);
+        if ($current === 'passport') {
+            return;
         }
+
+        $patched = $this->withAuthDriver($source, 'passport');
+
+        if ($patched !== null) {
+            $files->put($path, $patched);
+
+            return;
+        }
+
+        $this->components->warn("Set 'driver' => 'passport' in config/filament-mcp.php. The published file was left unchanged.");
+    }
+
+    /**
+     * The auth.driver value in a published config file, when it can be read.
+     */
+    protected function configuredAuthDriver(string $source): ?string
+    {
+        $matched = preg_match($this->authDriverPattern(), $source, $match);
+
+        return $matched === 1 ? (string) $match[4] : null;
+    }
+
+    /**
+     * Rewrites auth.driver, or returns null when that key is not in the auth array.
+     */
+    protected function withAuthDriver(string $source, string $driver): ?string
+    {
+        $patched = preg_replace($this->authDriverPattern(), '${1}\''.$driver.'\'', $source, 1);
+
+        if (! is_string($patched) || $patched === $source) {
+            return null;
+        }
+
+        return $patched;
+    }
+
+    protected function authDriverPattern(): string
+    {
+        return "/('auth'\s*=>\s*\[[^\]]*?(['\"])driver\\2\s*=>\s*)(['\"])(sanctum|passport)\\3/";
+    }
+
+    /**
+     * Passport only issues personal access tokens for a personal access client.
+     */
+    protected function reportPersonalAccessClient(): void
+    {
+        try {
+            $exists = Passport::client()->newQuery()->where('revoked', false)->get()
+                ->contains(fn (Client $client): bool => $client->hasGrantType('personal_access'));
+        } catch (\Throwable) {
+            $this->components->warn('No Passport personal access client could be checked. After migrating, run: php artisan passport:client --personal');
+
+            return;
+        }
+
+        if ($exists) {
+            $this->components->twoColumnDetail('Personal access client', 'found');
+
+            return;
+        }
+
+        $this->components->warn('No Passport personal access client found. Run: php artisan passport:client --personal');
     }
 
     protected function publishSanctumMigration(Filesystem $files): void
@@ -118,7 +196,7 @@ class InstallCommand extends Command
             return;
         }
 
-        if (in_array(HasApiTokens::class, class_uses_recursive($model), true)) {
+        if (in_array(self::SANCTUM_API_TOKENS, class_uses_recursive($model), true)) {
             $this->components->twoColumnDetail('HasApiTokens', 'already on '.class_basename($model));
 
             return;
@@ -163,7 +241,7 @@ class InstallCommand extends Command
             $body = "    use HasApiTokens;\n\n".$body;
         }
 
-        $head = $this->withImport(substr($source, 0, $bodyStart), HasApiTokens::class);
+        $head = $this->withImport(substr($source, 0, $bodyStart), self::SANCTUM_API_TOKENS);
 
         return $head === null ? null : $head.$body;
     }

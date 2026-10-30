@@ -2,6 +2,13 @@
 
 use Illuminate\Testing\TestResponse;
 
+function skipWithoutSanctum(): void
+{
+    if (! trait_exists('Laravel\\Sanctum\\HasApiTokens')) {
+        test()->markTestSkipped('laravel/sanctum is not installed.');
+    }
+}
+
 /**
  * @param  array<string, mixed>  $params
  */
