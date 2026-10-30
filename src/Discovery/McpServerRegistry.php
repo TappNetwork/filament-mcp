@@ -17,10 +17,11 @@ use Laravel\Mcp\Server\Transport\FakeTransporter;
 use Laravel\SerializableClosure\SerializableClosure;
 use Laravel\SerializableClosure\UnsignedSerializableClosure;
 use ReflectionFunction;
+use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
 
 /**
- * Finds the MCP servers the host registered with Mcp::web() behind the
- * Sanctum guard. Reads the router, so it also works with cached routes.
+ * Finds the MCP servers the host registered with Mcp::web() behind one of
+ * the configured auth guards. Reads the router, so it also works with cached routes.
  */
 class McpServerRegistry
 {
@@ -30,6 +31,7 @@ class McpServerRegistry
     public function __construct(
         private readonly Router $router,
         private readonly Container $container,
+        private readonly IssuesMcpTokens $tokens,
     ) {}
 
     /**
@@ -86,7 +88,7 @@ class McpServerRegistry
 
             $middleware = $this->router->gatherRouteMiddleware($route);
 
-            if (! in_array(ValidateMcpHeaders::class, $middleware, true) || ! $this->usesSanctum($middleware)) {
+            if (! in_array(ValidateMcpHeaders::class, $middleware, true) || ! $this->usesManagedGuard($middleware)) {
                 continue;
             }
 
@@ -105,8 +107,10 @@ class McpServerRegistry
     /**
      * @param  array<int, mixed>  $middleware
      */
-    protected function usesSanctum(array $middleware): bool
+    protected function usesManagedGuard(array $middleware): bool
     {
+        $guards = $this->tokens->guards();
+
         foreach ($middleware as $entry) {
             if (! is_string($entry)) {
                 continue;
@@ -114,7 +118,7 @@ class McpServerRegistry
 
             [$name, $parameters] = array_pad(explode(':', $entry, 2), 2, '');
 
-            if (($name === Authenticate::class || $name === 'auth') && in_array('sanctum', explode(',', $parameters), true)) {
+            if (($name === Authenticate::class || $name === 'auth') && array_intersect($guards, explode(',', $parameters)) !== []) {
                 return true;
             }
         }

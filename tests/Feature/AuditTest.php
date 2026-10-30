@@ -2,6 +2,10 @@
 
 use Spatie\Activitylog\Models\Activity;
 
+beforeEach(function () {
+    skipWithoutSanctum();
+});
+
 it('logs each tool call with the token, tool, server and outcome', function () {
     $user = $this->makeUser();
     $token = $user->createToken('t', ['list_reports']);

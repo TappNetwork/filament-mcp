@@ -43,6 +43,15 @@ class AuthorizeToolCalls implements Errable, Method
             $this->audit->with(['calls' => $this->authorizer->catalogCallNames($request)]);
         }
 
+        if ($this->authorizer->tokenExpired()) {
+            $this->audit->record($server->name, (string) $name, 'refused');
+
+            return JsonRpcResponse::result($request->id, [
+                'content' => [['type' => 'text', 'text' => 'Token has expired.']],
+                'isError' => true,
+            ]);
+        }
+
         $missing = $this->authorizer->missingAbility($tool, $request);
 
         if ($missing !== null) {

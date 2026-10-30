@@ -2,7 +2,9 @@
 
 namespace Tapp\FilamentMcp\Authorization;
 
+use DateTimeInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
@@ -45,9 +47,46 @@ class ToolAuthorizer
     {
         $user = Auth::user();
 
-        return $user !== null
-            && method_exists($user, 'tokenCan')
-            && $user->tokenCan($ability);
+        if ($user === null || ! method_exists($user, 'tokenCan')) {
+            return false;
+        }
+
+        if ($this->tokenExpired()) {
+            return false;
+        }
+
+        return $user->tokenCan($ability);
+    }
+
+    /**
+     * Whether the current token's expires_at is already past.
+     *
+     * Passport accepts a bearer until the JWT exp, which uses the system clock.
+     * The token row stores that same moment. Refusing a past row here honors the
+     * lifetime chosen at issue, including tokens whose row was given an expiry
+     * the JWT did not carry.
+     */
+    public function tokenExpired(): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null || ! method_exists($user, 'currentAccessToken')) {
+            return false;
+        }
+
+        $token = $user->currentAccessToken();
+
+        if (! is_object($token)) {
+            return false;
+        }
+
+        $expiresAt = data_get($token, 'expires_at');
+
+        if (! is_string($expiresAt) && ! $expiresAt instanceof DateTimeInterface) {
+            return false;
+        }
+
+        return Carbon::parse($expiresAt)->isPast();
     }
 
     /**

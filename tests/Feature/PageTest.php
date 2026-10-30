@@ -9,6 +9,8 @@ use Tapp\FilamentMcp\Pages\McpTokens;
 use function Pest\Livewire\livewire;
 
 beforeEach(function () {
+    skipWithoutSanctum();
+
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     $this->actingAs($this->user = $this->makeUser());
 });
@@ -51,7 +53,7 @@ it('falls back to the bare token when no MCP server uses Sanctum', function () {
 
     livewire(McpTokens::class)
         ->callAction('new', ['name' => 'Script', 'expiration' => '30', 'abilities' => ['export_csv']])
-        ->assertSee('No MCP server uses Sanctum tokens yet')
+        ->assertSee('No MCP server uses these tokens yet')
         ->assertDontSeeHtml('data-setup-step="1"');
 });
 

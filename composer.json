@@ -22,15 +22,18 @@
         "php": "^8.3",
         "filament/filament": "^4.14||^5.9",
         "illuminate/contracts": "^12.0||^13.0",
-        "laravel/mcp": "^1.0",
-        "laravel/sanctum": "^4.0"
+        "laravel/mcp": "^1.0"
     },
     "suggest": {
+        "laravel/passport": "Passport ^13 personal access tokens. Set filament-mcp.auth.driver to passport and run php artisan passport:client --personal.",
+        "laravel/sanctum": "Required for the default sanctum driver (^4). Install it before php artisan filament-mcp:install.",
         "spatie/laravel-activitylog": "Logs every MCP tool call made with a token."
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
+        "laravel/passport": "^13.0",
         "laravel/pint": "^1.14",
+        "laravel/sanctum": "^4.0",
         "nunomaduro/collision": "^8.1.1",
         "orchestra/testbench": "^10.0||^11.0",
         "pestphp/pest": "^3.0||^4.0",

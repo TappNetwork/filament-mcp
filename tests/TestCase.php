@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Server\McpServiceProvider;
+use Laravel\Passport\Passport;
+use Laravel\Passport\PassportServiceProvider;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -33,6 +35,10 @@ abstract class TestCase extends Orchestra
 {
     protected function getPackageProviders($app): array
     {
+        if (class_exists(Passport::class)) {
+            Passport::$registersRoutes = false;
+        }
+
         return array_values(array_filter([
             LivewireServiceProvider::class,
             BladeIconsServiceProvider::class,
@@ -46,7 +52,8 @@ abstract class TestCase extends Orchestra
             TablesServiceProvider::class,
             WidgetsServiceProvider::class,
             FilamentServiceProvider::class,
-            SanctumServiceProvider::class,
+            class_exists(SanctumServiceProvider::class) ? SanctumServiceProvider::class : null,
+            class_exists(PassportServiceProvider::class) ? PassportServiceProvider::class : null,
             McpServiceProvider::class,
             ActivitylogServiceProvider::class,
             FilamentMcpServiceProvider::class,

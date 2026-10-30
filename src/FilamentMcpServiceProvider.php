@@ -13,6 +13,9 @@ use Tapp\FilamentMcp\Authorization\FilterListedTools;
 use Tapp\FilamentMcp\Authorization\ToolAuthorizer;
 use Tapp\FilamentMcp\Commands\InstallCommand;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
+use Tapp\FilamentMcp\Tokens\PassportTokenIssuer;
+use Tapp\FilamentMcp\Tokens\SanctumTokenIssuer;
 
 class FilamentMcpServiceProvider extends ServiceProvider
 {
@@ -21,6 +24,12 @@ class FilamentMcpServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/filament-mcp.php', 'filament-mcp');
 
         $this->app->scoped(McpServerRegistry::class);
+        $this->app->bind(IssuesMcpTokens::class, function (Application $app): IssuesMcpTokens {
+            return match (config('filament-mcp.auth.driver', 'sanctum')) {
+                'passport' => $app->make(PassportTokenIssuer::class),
+                default => $app->make(SanctumTokenIssuer::class),
+            };
+        });
         $this->app->scoped(ToolCallAudit::class);
         $this->app->scoped(ToolAuthorizer::class);
 

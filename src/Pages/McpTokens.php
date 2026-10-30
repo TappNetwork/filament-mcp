@@ -21,18 +21,20 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use Laravel\Sanctum\Contracts\HasApiTokens;
-use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Passport\Passport;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Setup\SetupInstructions;
+use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
 
 /**
- * Lets a user create Sanctum tokens for the app's MCP servers, one ability per
- * tool, and shows the steps to connect an AI agent once a token is created.
+ * Lets a user create personal access tokens for the app's MCP servers, one
+ * ability per tool, and shows the steps to connect an AI agent once a token
+ * is created. The token system is the configured auth driver (Sanctum or Passport).
  */
 class McpTokens extends Page implements HasTable
 {
@@ -101,7 +103,7 @@ class McpTokens extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => $this->tokenOwner()->tokens()->getQuery())
+            ->query(fn () => $this->tokens()->tokensQuery($this->tokenOwner()))
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('name')
@@ -110,8 +112,8 @@ class McpTokens extends Page implements HasTable
                     ->searchable(),
                 TextColumn::make('abilities')
                     ->label(__('filament-mcp::tokens.abilities'))
-                    ->getStateUsing(fn (PersonalAccessToken $record): string => $this->summarizeAbilities($record->abilities ?? []))
-                    ->tooltip(fn (PersonalAccessToken $record): ?string => implode(', ', $this->abilityLabels($record->abilities ?? [])) ?: null),
+                    ->getStateUsing(fn (Model $record): string => $this->summarizeAbilities($this->tokens()->abilities($record)))
+                    ->tooltip(fn (Model $record): ?string => implode(', ', $this->abilityLabels($this->tokens()->abilities($record))) ?: null),
                 TextColumn::make('expires_at')
                     ->label(__('filament-mcp::tokens.expires_at'))
                     ->dateTime()
@@ -121,7 +123,8 @@ class McpTokens extends Page implements HasTable
                     ->label(__('filament-mcp::tokens.last_used_at'))
                     ->dateTime()
                     ->sortable()
-                    ->placeholder(__('filament-mcp::tokens.never')),
+                    ->placeholder(__('filament-mcp::tokens.never'))
+                    ->visible(fn (): bool => $this->tokens()->tracksLastUsedAt()),
                 TextColumn::make('created_at')
                     ->label(__('filament-mcp::tokens.created_at'))
                     ->dateTime()
@@ -130,11 +133,11 @@ class McpTokens extends Page implements HasTable
             ->recordActions([
                 ViewAction::make('details')
                     ->label(__('filament-mcp::tokens.details'))
-                    ->modalHeading(fn (PersonalAccessToken $record): string => (string) $record->getAttribute('name'))
+                    ->modalHeading(fn (Model $record): string => (string) $record->getAttribute('name'))
                     ->schema([
                         TextEntry::make('abilities')
                             ->label(__('filament-mcp::tokens.abilities'))
-                            ->state(fn (PersonalAccessToken $record): array => $this->abilityLabels($record->abilities ?? []))
+                            ->state(fn (Model $record): array => $this->abilityLabels($this->tokens()->abilities($record)))
                             ->badge()
                             ->placeholder(__('filament-mcp::tokens.none')),
                         TextEntry::make('expires_at')
@@ -147,7 +150,7 @@ class McpTokens extends Page implements HasTable
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->action(fn (PersonalAccessToken $record) => $record->delete()),
+                    ->action(fn (Model $record) => $this->tokens()->revoke($record)),
             ])
             ->toolbarActions([
                 BulkAction::make('revoke')
@@ -156,7 +159,7 @@ class McpTokens extends Page implements HasTable
                     ->color('danger')
                     ->requiresConfirmation()
                     ->deselectRecordsAfterCompletion()
-                    ->action(fn (Collection $records) => $records->each->delete()),
+                    ->action(fn (Collection $records) => $records->each(fn (Model $record) => $this->tokens()->revoke($record))),
             ]);
     }
 
@@ -167,11 +170,12 @@ class McpTokens extends Page implements HasTable
                 ->label(__('filament-mcp::tokens.create'))
                 ->schema(fn (): array => $this->getCreateTokenSchema())
                 ->action(function (array $data): void {
-                    $this->plainTextToken = $this->tokenOwner()->createToken(
+                    $this->plainTextToken = $this->tokens()->issue(
+                        $this->tokenOwner(),
                         $data['name'],
                         array_values($data['abilities'] ?? []),
                         $this->resolveExpiration($data),
-                    )->plainTextToken;
+                    );
 
                     Notification::make()
                         ->title(__('filament-mcp::tokens.created'))
@@ -185,18 +189,17 @@ class McpTokens extends Page implements HasTable
         ];
     }
 
+    protected function tokens(): IssuesMcpTokens
+    {
+        return app(IssuesMcpTokens::class);
+    }
+
     /**
-     * The signed-in user. Sanctum's HasApiTokens trait is enough; the
-     * interface is only for static analysis.
-     *
-     * @return HasApiTokens
+     * The signed-in user. It must use the HasApiTokens trait for the configured driver.
      */
     protected function tokenOwner(): mixed
     {
-        /** @var HasApiTokens $user */
-        $user = Auth::user();
-
-        return $user;
+        return Auth::user();
     }
 
     public function forgetPlainTextToken(): void
@@ -309,9 +312,27 @@ class McpTokens extends Page implements HasTable
         }
 
         $options['custom'] = __('filament-mcp::tokens.custom');
-        $options['never'] = __('filament-mcp::tokens.no_expiration');
+        $options['never'] = $this->neverExpiresLabel();
 
         return $options;
+    }
+
+    /**
+     * Passport has no token that never expires. "Never" on this form keeps
+     * Passport's personal access token lifetime, one year unless the app set
+     * Passport::personalAccessTokensExpireIn.
+     */
+    protected function neverExpiresLabel(): string
+    {
+        if ($this->tokens()->name() !== 'passport' || ! class_exists(Passport::class)) {
+            return __('filament-mcp::tokens.no_expiration');
+        }
+
+        $interval = Passport::$personalAccessTokensExpireIn ?? new \DateInterval('P1Y');
+
+        return __('filament-mcp::tokens.passport_lifetime', [
+            'date' => now()->add($interval)->format('M j, Y'),
+        ]);
     }
 
     protected function getDefaultExpiration(): string

@@ -1,6 +1,12 @@
 <?php
 
+use Laravel\Mcp\Facades\Mcp;
 use Laravel\Sanctum\Sanctum;
+
+beforeEach(function () {
+    skipWithoutSanctum();
+});
+use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Tests\Fixtures\PublicDocsServer;
 use Tapp\FilamentMcp\Tests\Fixtures\ReportsServer;
 use Tapp\FilamentMcp\Tests\Fixtures\Tools\CountStock;
@@ -89,6 +95,26 @@ it('enforces abilities in server tests that act as a Sanctum user', function () 
 it('does not guard a server test with no signed-in user', function () {
     ReportsServer::tool(DeleteReport::class)->assertOk()->assertSee('deleted');
     PublicDocsServer::tool(CountStock::class)->assertSee('42');
+});
+
+it('refuses a signed-in user with no access token', function () {
+    $this->actingAs($this->makeUser());
+
+    ReportsServer::tool(DeleteReport::class)->assertHasErrors(['Token lacks ability manage_reports.']);
+});
+
+it('refuses a web-guard session user who has no access token', function () {
+    config()->set('filament-mcp.auth.guards', ['web']);
+
+    Mcp::web('/mcp/session-reports', ReportsServer::class)->middleware('auth:web');
+    app(McpServerRegistry::class)->flush();
+
+    $this->actingAs($this->makeUser(), 'web');
+
+    callTool('/mcp/session-reports', 'delete_report')
+        ->assertOk()
+        ->assertJsonPath('result.isError', true)
+        ->assertJsonPath('result.content.0.text', 'Token lacks ability manage_reports.');
 });
 
 it('lets a signed-in browser session call tools, like Sanctum does for first-party requests', function () {

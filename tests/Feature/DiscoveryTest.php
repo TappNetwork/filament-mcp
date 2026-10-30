@@ -4,6 +4,8 @@ use Illuminate\Routing\Router;
 use Laravel\Mcp\Facades\Mcp;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Tests\Fixtures\LessonsServer;
+use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
+use Tapp\FilamentMcp\Tokens\PassportTokenIssuer;
 
 it('finds only the servers the host put behind Sanctum', function () {
     $servers = app(McpServerRegistry::class)->servers();
@@ -24,6 +26,24 @@ it('lists catalog tools, not the search and execute wrappers', function () {
 
 it('finds servers registered with a guard list or named auth middleware', function () {
     Mcp::web('/mcp/lessons', LessonsServer::class)->middleware(['web', 'auth:sanctum,web']);
+    app(McpServerRegistry::class)->flush();
+
+    expect(app(McpServerRegistry::class)->find('Lessons')?->url())->toBe('https://app.test/mcp/lessons');
+});
+
+it('resolves the passport issuer and its default guard from config', function () {
+    config()->set('filament-mcp.auth.driver', 'passport');
+
+    $tokens = app(IssuesMcpTokens::class);
+
+    expect($tokens)->toBeInstanceOf(PassportTokenIssuer::class)
+        ->and($tokens->guards())->toBe(['api']);
+});
+
+it('discovers servers behind the guards named in config', function () {
+    config()->set('filament-mcp.auth.guards', ['web']);
+
+    Mcp::web('/mcp/lessons', LessonsServer::class)->middleware('auth:web');
     app(McpServerRegistry::class)->flush();
 
     expect(app(McpServerRegistry::class)->find('Lessons')?->url())->toBe('https://app.test/mcp/lessons');
