@@ -2,9 +2,13 @@
 
 namespace Tapp\FilamentMcp;
 
+use Closure;
 use Filament\Actions\Action;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Filament\Support\Concerns\EvaluatesClosures;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Auth;
 use Tapp\FilamentMcp\Pages\McpTokens;
 
 /**
@@ -12,6 +16,24 @@ use Tapp\FilamentMcp\Pages\McpTokens;
  */
 class FilamentMcpPlugin implements Plugin
 {
+    use EvaluatesClosures;
+
+    /**
+     * When set, decides who can open the token page. When null, the page falls
+     * back to authorization.gate in config.
+     *
+     * @var bool|Closure(Authenticatable|null): bool|null
+     */
+    protected bool|Closure|null $canAccess = null;
+
+    /**
+     * Whether the signed-in user may manage every user's tokens (view, edit
+     * abilities, revoke). Default false keeps own-tokens-only.
+     *
+     * @var bool|Closure(Authenticatable|null): bool
+     */
+    protected bool|Closure $canManageAllTokens = false;
+
     public static function make(): static
     {
         return app(static::class);
@@ -30,6 +52,45 @@ class FilamentMcpPlugin implements Plugin
     protected function getPage(): string
     {
         return McpTokens::class;
+    }
+
+    /**
+     * @param  bool|Closure(Authenticatable|null): bool  $condition
+     */
+    public function canAccess(bool|Closure $condition): static
+    {
+        $this->canAccess = $condition;
+
+        return $this;
+    }
+
+    public function hasAccessCondition(): bool
+    {
+        return $this->canAccess !== null;
+    }
+
+    public function userCanAccess(): bool
+    {
+        return (bool) $this->evaluate($this->canAccess ?? false, [
+            'user' => Auth::user(),
+        ]);
+    }
+
+    /**
+     * @param  bool|Closure(Authenticatable|null): bool  $condition
+     */
+    public function canManageAllTokens(bool|Closure $condition): static
+    {
+        $this->canManageAllTokens = $condition;
+
+        return $this;
+    }
+
+    public function userCanManageAllTokens(): bool
+    {
+        return (bool) $this->evaluate($this->canManageAllTokens, [
+            'user' => Auth::user(),
+        ]);
     }
 
     public function register(Panel $panel): void

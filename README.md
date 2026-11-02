@@ -49,8 +49,14 @@ To add the plugin yourself:
 ```php
 use Tapp\FilamentMcp\FilamentMcpPlugin;
 
-$panel->plugin(FilamentMcpPlugin::make());
+$panel->plugin(
+    FilamentMcpPlugin::make()
+        ->canAccess(fn ($user) => $user->can('manage-mcp-tokens'))
+        ->canManageAllTokens(fn ($user) => $user->isSuperAdmin())
+);
 ```
+
+`canAccess` limits who can open the token page. When it is unset, the page falls back to `authorization.gate` in the config. `canManageAllTokens` lets some users see every user's tokens (with an Owner column) and edit or revoke them; creating a token still always issues it for the signed-in user. The default is false, so each user only manages their own. The package does not know about roles.
 
 ## Registering MCP servers
 
@@ -177,11 +183,13 @@ Set `audit.enabled` to `false` to turn it off.
 `config/filament-mcp.php` controls the page:
 
 - `navigation`: slug, icon, sidebar entry and user menu entry.
-- `authorization.gate`: a gate that decides who can manage tokens. The page and its menu entries are hidden from users the gate refuses.
+- `authorization.gate`: a gate that decides who can manage tokens when `FilamentMcpPlugin::canAccess()` is unset. The page and its menu entries are hidden from users the gate refuses.
 - `abilities`: form columns, expiry options and extra abilities.
 - `audit`: whether and where tool calls are logged.
 
 Set `abilities.allow_expiration` to `false` to create tokens that never expire.
+
+Prefer the plugin methods for access and manage-all (see Installation). `authorization.gate` remains as a fallback for page access.
 
 ## Testing your tools
 

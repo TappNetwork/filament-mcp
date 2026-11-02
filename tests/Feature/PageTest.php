@@ -1,5 +1,6 @@
 <?php
 
+use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
@@ -58,11 +59,33 @@ it('falls back to the bare token when no MCP server uses Sanctum', function () {
         ->assertDontSeeHtml('data-setup-step="1"');
 });
 
-it('respects the authorization gate', function () {
+it('respects the authorization gate when the plugin access condition is unset', function () {
     config()->set('filament-mcp.authorization.gate', 'manage-api-tokens');
     Gate::define('manage-api-tokens', fn () => false);
 
     expect(McpTokens::canAccess())->toBeFalse();
+});
+
+it('allows access when no plugin condition and no gate are set', function () {
+    expect(McpTokens::canAccess())->toBeTrue();
+});
+
+it('uses the plugin canAccess condition when set', function () {
+    filament()->getPlugin('filament-mcp')->canAccess(fn () => false);
+
+    expect(McpTokens::canAccess())->toBeFalse();
+
+    filament()->getPlugin('filament-mcp')->canAccess(fn ($user) => $user->is($this->user));
+
+    expect(McpTokens::canAccess())->toBeTrue();
+});
+
+it('prefers the plugin canAccess condition over the authorization gate', function () {
+    config()->set('filament-mcp.authorization.gate', 'manage-api-tokens');
+    Gate::define('manage-api-tokens', fn () => false);
+    filament()->getPlugin('filament-mcp')->canAccess(true);
+
+    expect(McpTokens::canAccess())->toBeTrue();
 });
 
 it('puts the agent-neutral prompt in step 1 and the token only in step 2', function () {
@@ -143,9 +166,65 @@ it('lists only the signed-in user\'s tokens and revokes them', function () {
     livewire(McpTokens::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner')
         ->callTableAction('revoke', $mine);
 
     expect(PersonalAccessToken::query()->pluck('name')->all())->toBe(['Theirs']);
+});
+
+it('cannot act on another user\'s token without manage-all, even with a forged record key', function () {
+    $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('revoke', $theirs))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(PersonalAccessToken::query()->find($theirs->id))
+        ->abilities->toBe(['list_reports']);
+});
+
+it('lists every token with an Owner column when canManageAllTokens allows', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(fn ($user) => $user->is($this->user));
+
+    $other = $this->makeUser();
+    $other->forceFill(['name' => 'Grace Hopper'])->save();
+
+    $mine = $this->user->createToken('Mine', ['list_reports'])->accessToken;
+    $theirs = $other->createToken('Theirs', ['list_reports'])->accessToken;
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine, $theirs])
+        ->assertTableColumnVisible('owner')
+        ->assertTableColumnStateSet('owner', 'Grace Hopper', $theirs)
+        ->callTableAction('edit', $theirs, ['abilities' => ['list_reports', 'manage_reports']])
+        ->assertHasNoTableActionErrors();
+
+    expect($theirs->refresh()->abilities)->toBe(['list_reports', 'manage_reports']);
+
+    livewire(McpTokens::class)
+        ->callAction('new', ['name' => 'Still mine', 'expiration' => '30', 'abilities' => ['list_reports']])
+        ->assertHasNoActionErrors();
+
+    expect(PersonalAccessToken::query()->where('name', 'Still mine')->sole()->tokenable->is($this->user))->toBeTrue();
+});
+
+it('keeps own-tokens-only when canManageAllTokens denies', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(false);
+
+    $mine = $this->user->createToken('Mine', ['list_reports'])->accessToken;
+    $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner');
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect($theirs->refresh()->abilities)->toBe(['list_reports']);
 });
 
 it('summarizes token abilities with their tool labels', function () {

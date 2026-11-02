@@ -81,6 +81,25 @@ class PassportTokenIssuer extends SanctumTokenIssuer
             ->getQuery();
     }
 
+    public function allTokensQuery(): Builder
+    {
+        if (! class_exists(Passport::class)) {
+            throw new RuntimeException('filament-mcp is set to the passport driver, but laravel/passport is not installed.');
+        }
+
+        return Passport::token()->newQuery()
+            ->where('revoked', false)
+            ->whereJsonContains('scopes', self::MARKER)
+            ->with('client');
+    }
+
+    public function owner(Model $token): ?Authenticatable
+    {
+        $owner = $token->getRelationValue('user');
+
+        return $owner instanceof Authenticatable ? $owner : null;
+    }
+
     public function abilities(Model $token): array
     {
         $scopes = $token->getAttribute('scopes');

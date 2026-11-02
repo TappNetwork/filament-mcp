@@ -1,5 +1,6 @@
 <?php
 
+use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -252,6 +253,103 @@ it('leaves the scopes of oauth tokens this page did not issue to the jwt', funct
     expect($token->refresh()->scopes)->toBe(['list_reports']);
 
     passportCall('/mcp/passport', 'list_reports', [], $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+});
+
+it('lists only the signed-in user\'s passport tokens by default', function () {
+    $issuer = app(IssuesMcpTokens::class);
+    $issuer->issue($this->user, 'Mine', ['list_reports'], now()->addDay());
+
+    $other = PassportUser::query()->create([
+        'name' => 'Grace',
+        'email' => 'grace'.uniqid().'@example.com',
+    ]);
+    $issuer->issue($other, 'Theirs', ['list_reports'], now()->addDay());
+
+    $mine = Token::query()->where('name', 'Mine')->sole();
+    $theirs = Token::query()->where('name', 'Theirs')->sole();
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner');
+});
+
+it('cannot act on another user\'s passport token without manage-all, even with a forged record key', function () {
+    $other = PassportUser::query()->create([
+        'name' => 'Grace',
+        'email' => 'grace'.uniqid().'@example.com',
+    ]);
+    app(IssuesMcpTokens::class)->issue($other, 'Theirs', ['list_reports'], now()->addDay());
+    $theirs = Token::query()->where('name', 'Theirs')->sole();
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('revoke', $theirs))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect($theirs->refresh())
+        ->revoked->toBeFalse()
+        ->scopes->toBe(['list_reports', PassportTokenIssuer::MARKER]);
+});
+
+it('lists every passport token with an Owner column when canManageAllTokens allows', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(fn ($user) => $user->is($this->user));
+
+    $issuer = app(IssuesMcpTokens::class);
+    $issuer->issue($this->user, 'Mine', ['list_reports'], now()->addDay());
+
+    $other = PassportUser::query()->create([
+        'name' => 'Grace Hopper',
+        'email' => 'grace'.uniqid().'@example.com',
+    ]);
+    $issuer->issue($other, 'Theirs', ['list_reports'], now()->addDay());
+
+    $mine = Token::query()->where('name', 'Mine')->sole();
+    $theirs = Token::query()->where('name', 'Theirs')->sole();
+    $unmarked = $other->createToken('CI script', ['*'])->token;
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine, $theirs])
+        ->assertCanNotSeeTableRecords([$unmarked])
+        ->assertTableColumnVisible('owner')
+        ->assertTableColumnStateSet('owner', 'Grace Hopper', $theirs)
+        ->callTableAction('edit', $theirs, ['abilities' => ['list_reports', 'manage_reports']])
+        ->assertHasNoTableActionErrors();
+
+    expect($theirs->refresh()->scopes)->toBe(['list_reports', 'manage_reports', PassportTokenIssuer::MARKER]);
+
+    livewire(McpTokens::class)
+        ->callAction('new', ['name' => 'Still mine', 'expiration' => '30', 'abilities' => ['list_reports']])
+        ->assertHasNoActionErrors();
+
+    expect(Token::query()->where('name', 'Still mine')->sole()->user_id)->toBe($this->user->getKey());
+});
+
+it('keeps own-passport-tokens-only when canManageAllTokens denies', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(false);
+
+    $issuer = app(IssuesMcpTokens::class);
+    $issuer->issue($this->user, 'Mine', ['list_reports'], now()->addDay());
+
+    $other = PassportUser::query()->create([
+        'name' => 'Grace',
+        'email' => 'grace'.uniqid().'@example.com',
+    ]);
+    $issuer->issue($other, 'Theirs', ['list_reports'], now()->addDay());
+
+    $mine = Token::query()->where('name', 'Mine')->sole();
+    $theirs = Token::query()->where('name', 'Theirs')->sole();
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner');
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect($theirs->refresh()->scopes)->toBe(['list_reports', PassportTokenIssuer::MARKER]);
 });
 
 /**

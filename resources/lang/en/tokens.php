@@ -4,6 +4,7 @@ return [
     'create' => 'Create token',
     'created' => 'Token created',
     'name' => 'Name',
+    'owner' => 'Owner',
     'abilities' => 'Abilities',
     'ability_count' => ':count ability|:count abilities',
     'all' => 'All tools',

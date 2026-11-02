@@ -56,7 +56,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Name a gate to limit who can create tokens. Leave it null to let every
-    | panel user manage their own tokens.
+    | panel user manage their own tokens. Prefer FilamentMcpPlugin::canAccess()
+    | when configuring a panel; this gate is the fallback when that is unset.
     |
     */
     'authorization' => [

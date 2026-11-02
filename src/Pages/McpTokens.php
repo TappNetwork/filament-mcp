@@ -7,6 +7,7 @@ use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -21,6 +22,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -28,6 +30,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Passport\Passport;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\FilamentMcpPlugin;
 use Tapp\FilamentMcp\Setup\SetupInstructions;
 use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
 
@@ -86,6 +89,12 @@ class McpTokens extends Page implements HasTable
 
     public static function canAccess(): bool
     {
+        $plugin = static::plugin();
+
+        if ($plugin?->hasAccessCondition()) {
+            return $plugin->userCanAccess();
+        }
+
         $gate = static::setting('authorization.gate');
 
         if (! static::setting('authorization.enabled', true) || blank($gate)) {
@@ -93,6 +102,28 @@ class McpTokens extends Page implements HasTable
         }
 
         return Gate::allows($gate);
+    }
+
+    /**
+     * Whether the signed-in user may manage every user's tokens (view, edit
+     * abilities, revoke). Default false keeps own-tokens-only.
+     */
+    public static function canManageAllTokens(): bool
+    {
+        return static::plugin()?->userCanManageAllTokens() ?? false;
+    }
+
+    protected static function plugin(): ?FilamentMcpPlugin
+    {
+        $panel = Filament::getCurrentPanel();
+
+        if ($panel === null || ! $panel->hasPlugin('filament-mcp')) {
+            return null;
+        }
+
+        $plugin = $panel->getPlugin('filament-mcp');
+
+        return $plugin instanceof FilamentMcpPlugin ? $plugin : null;
     }
 
     public function getTitle(): string
@@ -103,13 +134,17 @@ class McpTokens extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => $this->tokens()->tokensQuery($this->tokenOwner()))
+            ->query(fn () => $this->tokensTableQuery())
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('name')
                     ->label(__('filament-mcp::tokens.name'))
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('owner')
+                    ->label(__('filament-mcp::tokens.owner'))
+                    ->getStateUsing(fn (Model $record): ?string => $this->ownerLabel($record))
+                    ->visible(fn (): bool => static::canManageAllTokens()),
                 TextColumn::make('abilities')
                     ->label(__('filament-mcp::tokens.abilities'))
                     ->getStateUsing(fn (Model $record): string => $this->summarizeAbilities($this->tokens()->abilities($record)))
@@ -178,6 +213,34 @@ class McpTokens extends Page implements HasTable
                     ->deselectRecordsAfterCompletion()
                     ->action(fn (Collection $records) => $records->each(fn (Model $record) => $this->tokens()->revoke($record))),
             ]);
+    }
+
+    /**
+     * Own tokens unless the plugin allows managing every managed token.
+     * Actions resolve records through this query, so a forged key for another
+     * user's token fails when manage-all is off or denied.
+     */
+    protected function tokensTableQuery(): Builder
+    {
+        $tokens = $this->tokens();
+
+        return static::canManageAllTokens()
+            ? $tokens->allTokensQuery()
+            : $tokens->tokensQuery($this->tokenOwner());
+    }
+
+    protected function ownerLabel(Model $record): ?string
+    {
+        $owner = $this->tokens()->owner($record);
+
+        if ($owner === null) {
+            return null;
+        }
+
+        $name = $owner->getAttribute('name');
+        $email = $owner->getAttribute('email');
+
+        return filled($name) ? (string) $name : (filled($email) ? (string) $email : null);
     }
 
     protected function getHeaderActions(): array
