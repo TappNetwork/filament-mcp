@@ -2,7 +2,6 @@
 
 use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Mcp\Facades\Mcp;
@@ -275,7 +274,7 @@ it('lists only the signed-in user\'s passport tokens by default', function () {
         ->assertTableColumnHidden('owner');
 });
 
-it('cannot act on another user\'s passport token without the view-all gate, even with a forged record key', function () {
+it('cannot act on another user\'s passport token without manage-all, even with a forged record key', function () {
     $other = PassportUser::query()->create([
         'name' => 'Grace',
         'email' => 'grace'.uniqid().'@example.com',
@@ -294,9 +293,8 @@ it('cannot act on another user\'s passport token without the view-all gate, even
         ->scopes->toBe(['list_reports', PassportTokenIssuer::MARKER]);
 });
 
-it('lists every passport token with an Owner column when the view-all gate allows', function () {
-    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
-    Gate::define('view-all-mcp-tokens', fn () => true);
+it('lists every passport token with an Owner column when canManageAllTokens allows', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(fn ($user) => $user->is($this->user));
 
     $issuer = app(IssuesMcpTokens::class);
     $issuer->issue($this->user, 'Mine', ['list_reports'], now()->addDay());
@@ -328,9 +326,8 @@ it('lists every passport token with an Owner column when the view-all gate allow
     expect(Token::query()->where('name', 'Still mine')->sole()->user_id)->toBe($this->user->getKey());
 });
 
-it('keeps own-passport-tokens-only when the view-all gate denies', function () {
-    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
-    Gate::define('view-all-mcp-tokens', fn () => false);
+it('keeps own-passport-tokens-only when canManageAllTokens denies', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(false);
 
     $issuer = app(IssuesMcpTokens::class);
     $issuer->issue($this->user, 'Mine', ['list_reports'], now()->addDay());

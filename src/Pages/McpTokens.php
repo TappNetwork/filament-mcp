@@ -7,6 +7,7 @@ use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Passport\Passport;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
+use Tapp\FilamentMcp\FilamentMcpPlugin;
 use Tapp\FilamentMcp\Setup\SetupInstructions;
 use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
 
@@ -87,6 +89,12 @@ class McpTokens extends Page implements HasTable
 
     public static function canAccess(): bool
     {
+        $plugin = static::plugin();
+
+        if ($plugin?->hasAccessCondition()) {
+            return $plugin->userCanAccess();
+        }
+
         $gate = static::setting('authorization.gate');
 
         if (! static::setting('authorization.enabled', true) || blank($gate)) {
@@ -97,14 +105,25 @@ class McpTokens extends Page implements HasTable
     }
 
     /**
-     * Whether the signed-in user may see and manage every user's tokens.
-     * Named by authorization.view_all_gate; null or denied keeps own-tokens-only.
+     * Whether the signed-in user may manage every user's tokens (view, edit
+     * abilities, revoke). Default false keeps own-tokens-only.
      */
-    public static function canViewAllTokens(): bool
+    public static function canManageAllTokens(): bool
     {
-        $gate = static::setting('authorization.view_all_gate');
+        return static::plugin()?->userCanManageAllTokens() ?? false;
+    }
 
-        return filled($gate) && Gate::allows($gate);
+    protected static function plugin(): ?FilamentMcpPlugin
+    {
+        $panel = Filament::getCurrentPanel();
+
+        if ($panel === null || ! $panel->hasPlugin('filament-mcp')) {
+            return null;
+        }
+
+        $plugin = $panel->getPlugin('filament-mcp');
+
+        return $plugin instanceof FilamentMcpPlugin ? $plugin : null;
     }
 
     public function getTitle(): string
@@ -125,7 +144,7 @@ class McpTokens extends Page implements HasTable
                 TextColumn::make('owner')
                     ->label(__('filament-mcp::tokens.owner'))
                     ->getStateUsing(fn (Model $record): ?string => $this->ownerLabel($record))
-                    ->visible(fn (): bool => static::canViewAllTokens()),
+                    ->visible(fn (): bool => static::canManageAllTokens()),
                 TextColumn::make('abilities')
                     ->label(__('filament-mcp::tokens.abilities'))
                     ->getStateUsing(fn (Model $record): string => $this->summarizeAbilities($this->tokens()->abilities($record)))
@@ -197,15 +216,15 @@ class McpTokens extends Page implements HasTable
     }
 
     /**
-     * Own tokens unless the view-all gate allows listing every managed token.
+     * Own tokens unless the plugin allows managing every managed token.
      * Actions resolve records through this query, so a forged key for another
-     * user's token fails when view-all is off or denied.
+     * user's token fails when manage-all is off or denied.
      */
     protected function tokensTableQuery(): Builder
     {
         $tokens = $this->tokens();
 
-        return static::canViewAllTokens()
+        return static::canManageAllTokens()
             ? $tokens->allTokensQuery()
             : $tokens->tokensQuery($this->tokenOwner());
     }

@@ -59,11 +59,33 @@ it('falls back to the bare token when no MCP server uses Sanctum', function () {
         ->assertDontSeeHtml('data-setup-step="1"');
 });
 
-it('respects the authorization gate', function () {
+it('respects the authorization gate when the plugin access condition is unset', function () {
     config()->set('filament-mcp.authorization.gate', 'manage-api-tokens');
     Gate::define('manage-api-tokens', fn () => false);
 
     expect(McpTokens::canAccess())->toBeFalse();
+});
+
+it('allows access when no plugin condition and no gate are set', function () {
+    expect(McpTokens::canAccess())->toBeTrue();
+});
+
+it('uses the plugin canAccess condition when set', function () {
+    filament()->getPlugin('filament-mcp')->canAccess(fn () => false);
+
+    expect(McpTokens::canAccess())->toBeFalse();
+
+    filament()->getPlugin('filament-mcp')->canAccess(fn ($user) => $user->is($this->user));
+
+    expect(McpTokens::canAccess())->toBeTrue();
+});
+
+it('prefers the plugin canAccess condition over the authorization gate', function () {
+    config()->set('filament-mcp.authorization.gate', 'manage-api-tokens');
+    Gate::define('manage-api-tokens', fn () => false);
+    filament()->getPlugin('filament-mcp')->canAccess(true);
+
+    expect(McpTokens::canAccess())->toBeTrue();
 });
 
 it('puts the agent-neutral prompt in step 1 and the token only in step 2', function () {
@@ -150,7 +172,7 @@ it('lists only the signed-in user\'s tokens and revokes them', function () {
     expect(PersonalAccessToken::query()->pluck('name')->all())->toBe(['Theirs']);
 });
 
-it('cannot act on another user\'s token without the view-all gate, even with a forged record key', function () {
+it('cannot act on another user\'s token without manage-all, even with a forged record key', function () {
     $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
 
     expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
@@ -163,9 +185,8 @@ it('cannot act on another user\'s token without the view-all gate, even with a f
         ->abilities->toBe(['list_reports']);
 });
 
-it('lists every token with an Owner column when the view-all gate allows', function () {
-    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
-    Gate::define('view-all-mcp-tokens', fn () => true);
+it('lists every token with an Owner column when canManageAllTokens allows', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(fn ($user) => $user->is($this->user));
 
     $other = $this->makeUser();
     $other->forceFill(['name' => 'Grace Hopper'])->save();
@@ -189,9 +210,8 @@ it('lists every token with an Owner column when the view-all gate allows', funct
     expect(PersonalAccessToken::query()->where('name', 'Still mine')->sole()->tokenable->is($this->user))->toBeTrue();
 });
 
-it('keeps own-tokens-only when the view-all gate denies', function () {
-    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
-    Gate::define('view-all-mcp-tokens', fn () => false);
+it('keeps own-tokens-only when canManageAllTokens denies', function () {
+    filament()->getPlugin('filament-mcp')->canManageAllTokens(false);
 
     $mine = $this->user->createToken('Mine', ['list_reports'])->accessToken;
     $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
