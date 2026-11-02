@@ -178,10 +178,26 @@ Set `audit.enabled` to `false` to turn it off.
 
 - `navigation`: slug, icon, sidebar entry and user menu entry.
 - `authorization.gate`: a gate that decides who can manage tokens. The page and its menu entries are hidden from users the gate refuses.
+- `authorization.view_all_gate`: a gate that lets a user see and manage every user's tokens (with an Owner column). Leave it null so each user only sees their own. Creating a token still always issues it for the signed-in user.
 - `abilities`: form columns, expiry options and extra abilities.
 - `audit`: whether and where tool calls are logged.
 
 Set `abilities.allow_expiration` to `false` to create tokens that never expire.
+
+To let some users manage everyone's tokens, define a gate in your app and name it in the config. The package does not know about roles:
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('view-all-mcp-tokens', fn ($user) => $user->isSuperAdmin());
+```
+
+```php
+'authorization' => [
+    'gate' => null,
+    'view_all_gate' => 'view-all-mcp-tokens',
+],
+```
 
 ## Testing your tools
 

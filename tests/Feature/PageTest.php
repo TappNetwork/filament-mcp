@@ -1,5 +1,6 @@
 <?php
 
+use Filament\Actions\Exceptions\ActionNotResolvableException;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
@@ -143,9 +144,67 @@ it('lists only the signed-in user\'s tokens and revokes them', function () {
     livewire(McpTokens::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner')
         ->callTableAction('revoke', $mine);
 
     expect(PersonalAccessToken::query()->pluck('name')->all())->toBe(['Theirs']);
+});
+
+it('cannot act on another user\'s token without the view-all gate, even with a forged record key', function () {
+    $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('revoke', $theirs))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect(PersonalAccessToken::query()->find($theirs->id))
+        ->abilities->toBe(['list_reports']);
+});
+
+it('lists every token with an Owner column when the view-all gate allows', function () {
+    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
+    Gate::define('view-all-mcp-tokens', fn () => true);
+
+    $other = $this->makeUser();
+    $other->forceFill(['name' => 'Grace Hopper'])->save();
+
+    $mine = $this->user->createToken('Mine', ['list_reports'])->accessToken;
+    $theirs = $other->createToken('Theirs', ['list_reports'])->accessToken;
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine, $theirs])
+        ->assertTableColumnVisible('owner')
+        ->assertTableColumnStateSet('owner', 'Grace Hopper', $theirs)
+        ->callTableAction('edit', $theirs, ['abilities' => ['list_reports', 'manage_reports']])
+        ->assertHasNoTableActionErrors();
+
+    expect($theirs->refresh()->abilities)->toBe(['list_reports', 'manage_reports']);
+
+    livewire(McpTokens::class)
+        ->callAction('new', ['name' => 'Still mine', 'expiration' => '30', 'abilities' => ['list_reports']])
+        ->assertHasNoActionErrors();
+
+    expect(PersonalAccessToken::query()->where('name', 'Still mine')->sole()->tokenable->is($this->user))->toBeTrue();
+});
+
+it('keeps own-tokens-only when the view-all gate denies', function () {
+    config()->set('filament-mcp.authorization.view_all_gate', 'view-all-mcp-tokens');
+    Gate::define('view-all-mcp-tokens', fn () => false);
+
+    $mine = $this->user->createToken('Mine', ['list_reports'])->accessToken;
+    $theirs = $this->makeUser()->createToken('Theirs', ['list_reports'])->accessToken;
+
+    livewire(McpTokens::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs])
+        ->assertTableColumnHidden('owner');
+
+    expect(fn () => livewire(McpTokens::class)->callTableAction('edit', $theirs, ['abilities' => ['manage_reports']]))
+        ->toThrow(ActionNotResolvableException::class);
+
+    expect($theirs->refresh()->abilities)->toBe(['list_reports']);
 });
 
 it('summarizes token abilities with their tool labels', function () {

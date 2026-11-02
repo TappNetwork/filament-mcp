@@ -21,6 +21,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -95,6 +96,17 @@ class McpTokens extends Page implements HasTable
         return Gate::allows($gate);
     }
 
+    /**
+     * Whether the signed-in user may see and manage every user's tokens.
+     * Named by authorization.view_all_gate; null or denied keeps own-tokens-only.
+     */
+    public static function canViewAllTokens(): bool
+    {
+        $gate = static::setting('authorization.view_all_gate');
+
+        return filled($gate) && Gate::allows($gate);
+    }
+
     public function getTitle(): string
     {
         return __('filament-mcp::setup.title');
@@ -103,13 +115,17 @@ class McpTokens extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => $this->tokens()->tokensQuery($this->tokenOwner()))
+            ->query(fn () => $this->tokensTableQuery())
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('name')
                     ->label(__('filament-mcp::tokens.name'))
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('owner')
+                    ->label(__('filament-mcp::tokens.owner'))
+                    ->getStateUsing(fn (Model $record): ?string => $this->ownerLabel($record))
+                    ->visible(fn (): bool => static::canViewAllTokens()),
                 TextColumn::make('abilities')
                     ->label(__('filament-mcp::tokens.abilities'))
                     ->getStateUsing(fn (Model $record): string => $this->summarizeAbilities($this->tokens()->abilities($record)))
@@ -178,6 +194,34 @@ class McpTokens extends Page implements HasTable
                     ->deselectRecordsAfterCompletion()
                     ->action(fn (Collection $records) => $records->each(fn (Model $record) => $this->tokens()->revoke($record))),
             ]);
+    }
+
+    /**
+     * Own tokens unless the view-all gate allows listing every managed token.
+     * Actions resolve records through this query, so a forged key for another
+     * user's token fails when view-all is off or denied.
+     */
+    protected function tokensTableQuery(): Builder
+    {
+        $tokens = $this->tokens();
+
+        return static::canViewAllTokens()
+            ? $tokens->allTokensQuery()
+            : $tokens->tokensQuery($this->tokenOwner());
+    }
+
+    protected function ownerLabel(Model $record): ?string
+    {
+        $owner = $this->tokens()->owner($record);
+
+        if ($owner === null) {
+            return null;
+        }
+
+        $name = $owner->getAttribute('name');
+        $email = $owner->getAttribute('email');
+
+        return filled($name) ? (string) $name : (filled($email) ? (string) $email : null);
     }
 
     protected function getHeaderActions(): array

@@ -6,6 +6,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 
 class SanctumTokenIssuer implements IssuesMcpTokens
@@ -42,6 +43,24 @@ class SanctumTokenIssuer implements IssuesMcpTokens
         }
 
         return $user->tokens()->getQuery();
+    }
+
+    public function allTokensQuery(): Builder
+    {
+        if (! trait_exists(self::SANCTUM_API_TOKENS) || ! class_exists(Sanctum::class)) {
+            throw new RuntimeException('filament-mcp is set to the sanctum driver, but laravel/sanctum is not installed.');
+        }
+
+        $model = Sanctum::personalAccessTokenModel();
+
+        return $model::query()->with('tokenable');
+    }
+
+    public function owner(Model $token): ?Authenticatable
+    {
+        $owner = $token->getRelationValue('tokenable');
+
+        return $owner instanceof Authenticatable ? $owner : null;
     }
 
     public function abilities(Model $token): array

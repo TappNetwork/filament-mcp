@@ -29,6 +29,16 @@ interface IssuesMcpTokens
     public function tokensQuery(Authenticatable $user): Builder;
 
     /**
+     * Every token this page manages, across users. Used when the view-all gate allows.
+     */
+    public function allTokensQuery(): Builder;
+
+    /**
+     * The user who owns the token, for the Owner column.
+     */
+    public function owner(Model $token): ?Authenticatable;
+
+    /**
      * @return list<string>
      */
     public function abilities(Model $token): array;

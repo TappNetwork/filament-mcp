@@ -58,10 +58,15 @@ return [
     | Name a gate to limit who can create tokens. Leave it null to let every
     | panel user manage their own tokens.
     |
+    | view_all_gate: name a gate that lets a user see and manage every user's
+    | tokens on the page. Leave it null (the default) so each user only sees
+    | their own. Creating a token still always issues it for the signed-in user.
+    |
     */
     'authorization' => [
         'enabled' => true,
         'gate' => null,
+        'view_all_gate' => null,
     ],
 
     /*
