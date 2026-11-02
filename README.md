@@ -2,7 +2,7 @@
 
 MCP for Laravel apps with a Filament panel. Users create Laravel Sanctum tokens for your app's MCP servers on a Filament page, and after creating one they get the steps to connect any AI agent to it.
 
-- **A token page made for MCP.** Users name a token, pick its abilities and an expiry, and can see and revoke their tokens. The new token is shown once, in the response that created it.
+- **A token page made for MCP.** Users name a token, pick its abilities and an expiry, and can see, edit the abilities of, and revoke their tokens. Editing keeps the same token, so a connected agent gets the new abilities on its next request. The new token is shown once, in the response that created it.
 - **Abilities come from your tools.** Every tool on an MCP server behind `auth:sanctum` becomes a Sanctum ability. Add a tool to a server and it shows up on the token form. You don't maintain an ability list.
 - **Tokens only reach the tools they're allowed.** A tool call is refused when the token lacks that tool's ability, and `tools/list` only shows tools the token can call.
 - **Setup steps come from your routes.** The setup prompt and the JSON config use each server's name and URL, so they follow your routes.
@@ -92,6 +92,8 @@ Passport cannot issue a token with no `exp`. Choosing "never", or turning expiry
 Every token this page issues also gets a `filament-mcp` scope. The page lists and revokes only tokens that have it, so an authorization-code token or a personal access token created somewhere else is left alone, refresh token included. The scope is not shown as an ability. Tokens issued before this scope was added do not have it: they keep working until they expire or are revoked outside this page, and this page will not list or revoke them.
 
 Tool abilities are registered as Passport scopes when the token is created, alongside any scopes the app already defined. A token created with the `*` scope can call every tool. Passport already treats `*` as a defined scope, so it is not added to the app's scope list. Revoking a token sets `revoked` instead of deleting the row.
+
+A Passport JWT keeps the scopes it was issued with. For tokens this page issued, tool calls are checked against the scopes on the token row instead, so editing a token's abilities changes what that same token can call. Tokens without the `filament-mcp` scope are still checked against their JWT.
 
 ## Abilities
 

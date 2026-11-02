@@ -145,6 +145,23 @@ class McpTokens extends Page implements HasTable
                             ->dateTime()
                             ->placeholder(__('filament-mcp::tokens.never')),
                     ]),
+                Action::make('edit')
+                    ->label(__('filament-mcp::tokens.edit'))
+                    ->icon('heroicon-o-pencil-square')
+                    ->modalHeading(fn (Model $record): string => __('filament-mcp::tokens.edit_heading', ['name' => (string) $record->getAttribute('name')]))
+                    ->modalDescription(__('filament-mcp::tokens.edit_description'))
+                    ->fillForm(fn (Model $record): array => [
+                        'abilities' => array_values(array_intersect($this->tokens()->abilities($record), array_keys($this->getAbilityOptions()))),
+                    ])
+                    ->schema(fn (): array => [$this->getAbilitiesField()])
+                    ->action(function (Model $record, array $data): void {
+                        $this->tokens()->updateAbilities($record, array_values($data['abilities'] ?? []));
+
+                        Notification::make()
+                            ->title(__('filament-mcp::tokens.updated'))
+                            ->success()
+                            ->send();
+                    }),
                 Action::make('revoke')
                     ->label(__('filament-mcp::tokens.revoke'))
                     ->icon('heroicon-o-trash')
@@ -251,11 +268,7 @@ class McpTokens extends Page implements HasTable
             ->required()
             ->maxLength(255);
 
-        $abilities = CheckboxList::make('abilities')
-            ->label(__('filament-mcp::tokens.abilities'))
-            ->options(fn (): array => $this->getAbilityOptions())
-            ->columns(static::setting('abilities.columns', 2))
-            ->bulkToggleable();
+        $abilities = $this->getAbilitiesField();
 
         if (! static::setting('abilities.allow_expiration', true)) {
             return [$name, $abilities];
@@ -279,6 +292,15 @@ class McpTokens extends Page implements HasTable
                 ->required(fn (Get $get): bool => $get('expiration') === 'custom'),
             $abilities,
         ];
+    }
+
+    protected function getAbilitiesField(): CheckboxList
+    {
+        return CheckboxList::make('abilities')
+            ->label(__('filament-mcp::tokens.abilities'))
+            ->options(fn (): array => $this->getAbilityOptions())
+            ->columns(static::setting('abilities.columns', 2))
+            ->bulkToggleable();
     }
 
     /**

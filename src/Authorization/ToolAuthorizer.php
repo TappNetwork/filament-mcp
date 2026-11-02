@@ -15,6 +15,7 @@ use Laravel\Mcp\Transport\JsonRpcRequest;
 use Tapp\FilamentMcp\Discovery\McpServer;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Discovery\ToolAbility;
+use Tapp\FilamentMcp\Tokens\IssuesMcpTokens;
 
 /**
  * Decides which tools the current token may call on a discovered server.
@@ -23,6 +24,7 @@ class ToolAuthorizer
 {
     public function __construct(
         private readonly McpServerRegistry $registry,
+        private readonly IssuesMcpTokens $tokens,
     ) {}
 
     /**
@@ -47,15 +49,11 @@ class ToolAuthorizer
     {
         $user = Auth::user();
 
-        if ($user === null || ! method_exists($user, 'tokenCan')) {
+        if ($user === null || $this->tokenExpired()) {
             return false;
         }
 
-        if ($this->tokenExpired()) {
-            return false;
-        }
-
-        return $user->tokenCan($ability);
+        return $this->tokens->allows($user, $ability);
     }
 
     /**

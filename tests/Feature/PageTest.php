@@ -2,6 +2,7 @@
 
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\Pages\McpTokens;
@@ -168,3 +169,64 @@ it('adds the page to the user menu and hides it from users the gate refuses', fu
 
     expect($item())->toBeNull();
 });
+
+it('adds an ability to an existing token, which then calls both tools', function () {
+    $page = livewire(McpTokens::class)
+        ->callAction('new', ['name' => 'Agent', 'expiration' => '30', 'abilities' => ['list_reports']]);
+
+    $plain = $page->get('plainTextToken');
+    $token = PersonalAccessToken::query()->sole();
+
+    sanctumCall('list_reports', $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+    sanctumCall('delete_report', $plain)->assertJsonPath('result.content.0.text', 'Token lacks ability manage_reports.');
+
+    $this->actingAs($this->user);
+
+    livewire(McpTokens::class)
+        ->mountTableAction('edit', $token)
+        ->assertTableActionDataSet(['abilities' => ['list_reports']])
+        ->setTableActionData(['abilities' => ['list_reports', 'manage_reports']])
+        ->callMountedTableAction()
+        ->assertHasNoTableActionErrors();
+
+    expect(PersonalAccessToken::query()->sole())
+        ->id->toBe($token->id)
+        ->token->toBe($token->token)
+        ->abilities->toBe(['list_reports', 'manage_reports']);
+
+    sanctumCall('list_reports', $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+    sanctumCall('delete_report', $plain)->assertJsonPath('result.content.0.text', 'deleted');
+});
+
+it('stops a token from calling a tool once its ability is removed', function () {
+    $plain = $this->user->createToken('Agent', ['list_reports', 'manage_reports'])->plainTextToken;
+    $token = PersonalAccessToken::query()->sole();
+
+    livewire(McpTokens::class)
+        ->callTableAction('edit', $token, ['abilities' => ['manage_reports']])
+        ->assertHasNoTableActionErrors();
+
+    sanctumCall('list_reports', $plain)->assertJsonPath('result.content.0.text', 'Token lacks ability list_reports.');
+    sanctumCall('delete_report', $plain)->assertJsonPath('result.content.0.text', 'deleted');
+});
+
+it('only offers MCP abilities when editing a token', function () {
+    $token = $this->user->createToken('Agent', ['list_reports'])->accessToken;
+
+    livewire(McpTokens::class)
+        ->callTableAction('edit', $token, ['abilities' => ['list_reports', 'delete_everything']])
+        ->assertHasTableActionErrors(['abilities.1']);
+
+    expect($token->refresh()->abilities)->toBe(['list_reports']);
+});
+
+/**
+ * The sanctum guard prefers the signed-in web user over the bearer, so each
+ * call starts from empty guards and authenticates with the token alone.
+ */
+function sanctumCall(string $name, string $token): TestResponse
+{
+    app('auth')->forgetGuards();
+
+    return callTool('/mcp/reports', $name, [], $token);
+}

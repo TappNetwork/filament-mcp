@@ -18,5 +18,9 @@ return [
     'no_expiration' => 'No expiration',
     'passport_lifetime' => 'Passport lifetime (:date)',
     'details' => 'Details',
+    'edit' => 'Edit abilities',
+    'edit_heading' => 'Edit abilities for :name',
+    'edit_description' => 'The token keeps working with the same value. Agents using it get the new abilities on their next request.',
+    'updated' => 'Abilities updated',
     'revoke' => 'Revoke',
 ];

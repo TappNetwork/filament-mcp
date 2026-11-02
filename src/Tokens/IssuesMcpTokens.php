@@ -33,6 +33,18 @@ interface IssuesMcpTokens
      */
     public function abilities(Model $token): array;
 
+    /**
+     * Replaces the token's abilities in place. The plain-text token stays the same.
+     *
+     * @param  list<string>  $abilities
+     */
+    public function updateAbilities(Model $token, array $abilities): void;
+
+    /**
+     * Whether the user's current token grants the ability.
+     */
+    public function allows(Authenticatable $user, string $ability): bool;
+
     public function revoke(Model $token): void;
 
     public function tracksLastUsedAt(): bool;

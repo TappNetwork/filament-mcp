@@ -200,6 +200,60 @@ it('lets a passport token with the star scope call every tool', function () {
         ->assertJsonPath('result.content.0.text', 'deleted');
 });
 
+it('adds a scope to an existing passport token, which then calls both tools', function () {
+    $page = livewire(McpTokens::class)
+        ->callAction('new', ['name' => 'Agent', 'expiration' => '30', 'abilities' => ['list_reports']]);
+
+    $plain = $page->get('plainTextToken');
+    $token = Token::query()->where('name', 'Agent')->sole();
+
+    passportCall('/mcp/passport', 'list_reports', [], $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+    passportCall('/mcp/passport', 'delete_report', [], $plain)->assertJsonPath('result.content.0.text', 'Token lacks ability manage_reports.');
+
+    $this->actingAs($this->user);
+
+    livewire(McpTokens::class)
+        ->mountTableAction('edit', $token)
+        ->assertTableActionDataSet(['abilities' => ['list_reports']])
+        ->setTableActionData(['abilities' => ['list_reports', 'manage_reports']])
+        ->callMountedTableAction()
+        ->assertHasNoTableActionErrors();
+
+    expect(Token::query()->where('name', 'Agent')->sole())
+        ->id->toBe($token->id)
+        ->scopes->toBe(['list_reports', 'manage_reports', PassportTokenIssuer::MARKER]);
+
+    passportCall('/mcp/passport', 'list_reports', [], $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+    passportCall('/mcp/passport', 'delete_report', [], $plain)->assertJsonPath('result.content.0.text', 'deleted');
+
+    $names = collect(mcpAs('/mcp/passport', 'tools/list', $plain)->json('result.tools'))->pluck('name')->all();
+
+    expect($names)->toBe(['list_reports', 'delete_report', 'rename_report']);
+});
+
+it('stops a passport token from calling a tool once its scope is removed', function () {
+    $plain = app(IssuesMcpTokens::class)->issue($this->user, 'Agent', ['list_reports', 'manage_reports'], now()->addDay());
+    $token = Token::query()->where('name', 'Agent')->sole();
+
+    livewire(McpTokens::class)
+        ->callTableAction('edit', $token, ['abilities' => ['manage_reports']])
+        ->assertHasNoTableActionErrors();
+
+    passportCall('/mcp/passport', 'list_reports', [], $plain)->assertJsonPath('result.content.0.text', 'Token lacks ability list_reports.');
+    passportCall('/mcp/passport', 'delete_report', [], $plain)->assertJsonPath('result.content.0.text', 'deleted');
+});
+
+it('leaves the scopes of oauth tokens this page did not issue to the jwt', function () {
+    $plain = $this->user->createToken('CI script', ['list_reports'])->accessToken;
+    $token = Token::query()->where('name', 'CI script')->sole();
+
+    app(IssuesMcpTokens::class)->updateAbilities($token, ['manage_reports']);
+
+    expect($token->refresh()->scopes)->toBe(['list_reports']);
+
+    passportCall('/mcp/passport', 'list_reports', [], $plain)->assertJsonPath('result.content.0.text', 'report-1, report-2');
+});
+
 /**
  * The passport guard keeps the first bearer for the whole test, so each call
  * starts from an empty guard and reads the token it was given.
@@ -218,4 +272,11 @@ function jwtExpiry(string $jwt): int
     $payload = json_decode(base64_decode(strtr($segment, '-_', '+/')), true);
 
     return (int) $payload['exp'];
+}
+
+function mcpAs(string $uri, string $method, string $token): TestResponse
+{
+    app('auth')->forgetGuards();
+
+    return mcp($uri, $method, [], $token);
 }
