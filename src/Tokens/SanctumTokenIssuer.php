@@ -51,6 +51,16 @@ class SanctumTokenIssuer implements IssuesMcpTokens
         return is_array($abilities) ? array_values($abilities) : [];
     }
 
+    public function updateAbilities(Model $token, array $abilities): void
+    {
+        $token->forceFill(['abilities' => array_values($abilities)])->save();
+    }
+
+    public function allows(Authenticatable $user, string $ability): bool
+    {
+        return method_exists($user, 'tokenCan') && $user->tokenCan($ability);
+    }
+
     public function revoke(Model $token): void
     {
         $token->delete();

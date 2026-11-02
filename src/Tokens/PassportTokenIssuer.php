@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Laravel\Passport\AccessToken;
 use Laravel\Passport\Passport;
 use RuntimeException;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
@@ -92,6 +93,32 @@ class PassportTokenIssuer extends SanctumTokenIssuer
             $scopes,
             fn (mixed $scope): bool => $scope !== self::MARKER,
         ));
+    }
+
+    public function updateAbilities(Model $token, array $abilities): void
+    {
+        if (! $this->issuedHere($token)) {
+            return;
+        }
+
+        $token->forceFill(['scopes' => $this->withMarker($abilities)])->save();
+    }
+
+    /**
+     * The JWT carries the scopes it was issued with and cannot change. For a
+     * token this page issued, the scopes on its row decide instead, so an edit
+     * on the page takes effect for the token the agent already holds.
+     */
+    public function allows(Authenticatable $user, string $ability): bool
+    {
+        $token = method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
+        $scopes = is_object($token) ? data_get($token, 'scopes') : null;
+
+        if (! is_array($scopes) || ! in_array(self::MARKER, $scopes, true)) {
+            return parent::allows($user, $ability);
+        }
+
+        return (new AccessToken(['oauth_scopes' => $scopes]))->can($ability);
     }
 
     public function revoke(Model $token): void
