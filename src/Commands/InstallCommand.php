@@ -5,6 +5,8 @@ namespace Tapp\FilamentMcp\Commands;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
@@ -177,6 +179,7 @@ class InstallCommand extends Command
         if (! $published) {
             $this->callSilently('vendor:publish', ['--tag' => 'sanctum-migrations']);
             $this->components->twoColumnDetail('Sanctum migration', 'published');
+            $this->alignTokenableMorph($files);
         } else {
             $this->components->twoColumnDetail('Sanctum migration', 'already published');
         }
@@ -202,9 +205,10 @@ class InstallCommand extends Command
             return;
         }
 
-        $path = (new ReflectionClass($model))->getFileName();
+        $reflection = new ReflectionClass($model);
+        $path = $reflection->getFileName();
         $source = $path === false ? null : $files->get($path);
-        $patched = $source === null ? null : $this->withTrait($source);
+        $patched = $source === null ? null : $this->withTrait($source, $reflection->getShortName());
 
         if ($path === false || $patched === null) {
             $this->components->warn("Add Laravel\\Sanctum\\HasApiTokens to {$model}.");
@@ -220,15 +224,110 @@ class InstallCommand extends Command
     }
 
     /**
-     * Adds the import and the trait, or returns null when the class can't be read.
+     * morphs() stores an integer id. UUID and ULID keys need a string morph.
+     * A plain string $keyType uses uuidMorphs: that column fits a UUID, and a ULID fits in it too.
+     * An already published migration is left alone.
      */
-    public function withTrait(string $source): ?string
+    protected function alignTokenableMorph(Filesystem $files): void
     {
-        if (! preg_match('/^class\s+\w+[^{]*\{\n/m', $source, $class, PREG_OFFSET_CAPTURE)) {
+        $model = config('auth.providers.users.model');
+        $method = is_string($model) ? $this->tokenableMorphMethod($model) : null;
+
+        if ($method === null) {
+            return;
+        }
+
+        foreach ($files->glob(database_path('migrations/*_create_personal_access_tokens_table.php')) as $path) {
+            $source = $files->get($path);
+            $patched = $this->withTokenableMorph($source, $method);
+
+            if ($patched === null) {
+                $this->components->warn("Change morphs('tokenable') to {$method}('tokenable') in the personal_access_tokens migration. morphs() stores an integer id.");
+
+                return;
+            }
+
+            if ($patched !== $source) {
+                $files->put($path, $patched);
+                $this->components->twoColumnDetail('tokenable id', $method);
+            }
+        }
+    }
+
+    /**
+     * ulidMorphs for HasUlids, uuidMorphs for HasUuids or a string $keyType.
+     */
+    protected function tokenableMorphMethod(string $model): ?string
+    {
+        if (! class_exists($model)) {
             return null;
         }
 
-        $bodyStart = $class[0][1] + strlen($class[0][0]);
+        foreach ([class_uses($model), class_uses_recursive($model)] as $traits) {
+            if (! is_array($traits)) {
+                continue;
+            }
+
+            if (in_array(HasUlids::class, $traits, true)) {
+                return 'ulidMorphs';
+            }
+
+            if (in_array(HasUuids::class, $traits, true)) {
+                return 'uuidMorphs';
+            }
+        }
+
+        $keyType = (new ReflectionClass($model))->getDefaultProperties()['keyType'] ?? null;
+
+        return $keyType === 'string' ? 'uuidMorphs' : null;
+    }
+
+    /**
+     * Rewrites morphs('tokenable'), or returns null when that call is not there.
+     * A migration that already uses uuidMorphs or ulidMorphs is left as it is.
+     */
+    public function withTokenableMorph(string $source, string $method): ?string
+    {
+        if (! in_array($method, ['uuidMorphs', 'ulidMorphs'], true)) {
+            return null;
+        }
+
+        if (preg_match('/->\s*(?:uuidMorphs|ulidMorphs)\s*\(\s*([\'"])tokenable\1/', $source) === 1) {
+            return $source;
+        }
+
+        $count = 0;
+        $patched = preg_replace(
+            '/->\s*morphs\s*\(\s*([\'"])tokenable\1/',
+            '->'.$method.'($1tokenable$1',
+            $source,
+            1,
+            $count,
+        );
+
+        if (! is_string($patched) || $count !== 1) {
+            return null;
+        }
+
+        return $patched;
+    }
+
+    /**
+     * Adds the import and the trait, or returns null when the class can't be read.
+     *
+     * Modifiers (final, readonly, abstract) and attributes above the class are left in place.
+     * The match is anchored to $class when it is given.
+     */
+    public function withTrait(string $source, ?string $class = null): ?string
+    {
+        $name = $class === null ? '\w+' : preg_quote($class, '/');
+        $pattern = '/^[ \t]*(?:(?:abstract|final|readonly)[ \t]+)*class[ \t]+'.$name.'\b[^{]*\{[ \t]*\r?\n/m';
+
+        if (! preg_match($pattern, $source, $declaration, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $bodyStart = $declaration[0][1] + strlen($declaration[0][0]);
         $body = substr($source, $bodyStart);
 
         if (preg_match('/^\s*use\s+[^;]*\bHasApiTokens\b/m', $body)) {
