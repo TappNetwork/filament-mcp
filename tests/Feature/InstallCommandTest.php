@@ -76,7 +76,9 @@ it('sets up the token page in one command', function () {
         ->toContain("use Tapp\\FilamentMcp\\FilamentMcpPlugin;\n")
         ->toContain("            ->id('admin')\n            ->plugin(FilamentMcpPlugin::make())\n")
         ->and(config_path('filament-mcp.php'))->toBeFile()
-        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
+        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1)
+        ->and(File::get(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php'))[0]))
+        ->toContain("\$table->morphs('tokenable');");
 });
 
 it('installs the passport driver without adding Sanctum', function () {
@@ -187,4 +189,233 @@ it('adds the trait to a model with no traits yet', function () {
 
 it('fails when the panel does not exist', function () {
     $this->artisan('filament-mcp:install', ['--panel' => 'missing', '--no-migrate' => true])->assertFailed();
+});
+
+it('adds HasApiTokens on a class with modifiers and an existing trait line', function (string $declaration) {
+    $source = <<<PHP
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Factories\HasFactory;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Illuminate\Notifications\Notifiable;
+
+    {$declaration}
+    {
+        use HasFactory, Notifiable;
+
+        protected \$guarded = [];
+    }
+    PHP;
+
+    $patched = app(InstallCommand::class)->withTrait($source, 'User');
+    $again = app(InstallCommand::class)->withTrait((string) $patched, 'User');
+
+    expect($patched)
+        ->toContain("use Laravel\\Sanctum\\HasApiTokens;\n")
+        ->toContain('use HasApiTokens, HasFactory, Notifiable;')
+        ->toContain($declaration)
+        ->and(substr_count((string) $patched, 'HasApiTokens'))->toBe(2)
+        ->and($again)->toBe($patched);
+})->with([
+    'class' => 'class User extends Authenticatable',
+    'final' => 'final class User extends Authenticatable',
+    'readonly' => 'readonly class User extends Authenticatable',
+    'abstract' => 'abstract class User extends Authenticatable',
+    'final readonly' => 'final readonly class User extends Authenticatable',
+    'readonly final' => 'readonly final class User extends Authenticatable',
+    'abstract readonly' => 'abstract readonly class User extends Authenticatable',
+]);
+
+it('adds the trait when attributes sit above the class', function () {
+    $source = <<<'PHP'
+    <?php
+
+    declare(strict_types=1);
+
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Attributes\Hidden;
+    use Illuminate\Database\Eloquent\Factories\HasFactory;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Illuminate\Notifications\Notifiable;
+
+    /**
+     * @property-read array{name: string} $id
+     */
+    #[Hidden([
+        'password',
+        'remember_token',
+    ])]
+    final class User extends Authenticatable
+    {
+        use HasFactory, Notifiable;
+
+        protected $guarded = [];
+    }
+    PHP;
+
+    $patched = app(InstallCommand::class)->withTrait($source, 'User');
+    $again = app(InstallCommand::class)->withTrait((string) $patched, 'User');
+
+    expect($patched)
+        ->toContain("use Laravel\\Sanctum\\HasApiTokens;\n")
+        ->toContain("#[Hidden([\n    'password',\n    'remember_token',\n])]\nfinal class User extends Authenticatable")
+        ->toContain('use HasApiTokens, HasFactory, Notifiable;')
+        ->and(substr_count((string) $patched, 'HasApiTokens'))->toBe(2)
+        ->and($again)->toBe($patched);
+});
+
+it('leaves a model that already uses HasApiTokens alone', function (string $source) {
+    expect(app(InstallCommand::class)->withTrait($source, 'User'))->toBe($source);
+})->with([
+    'own trait line' => <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Laravel\Sanctum\HasApiTokens;
+
+    final class User extends Authenticatable
+    {
+        use HasApiTokens;
+    }
+    PHP,
+    'trait already in the list' => <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Factories\HasFactory;
+    use Illuminate\Notifications\Notifiable;
+    use Laravel\Sanctum\HasApiTokens;
+
+    final readonly class User extends Authenticatable
+    {
+        use HasFactory, HasApiTokens, Notifiable;
+    }
+    PHP,
+]);
+
+it('does not patch a different class when the model name is given', function () {
+    $source = <<<'PHP'
+    <?php
+
+    namespace App\Models;
+
+    class Username extends Authenticatable
+    {
+        protected $guarded = [];
+    }
+    PHP;
+
+    expect(app(InstallCommand::class)->withTrait($source, 'User'))->toBeNull();
+});
+
+it('rewrites morphs(tokenable) and leaves a string morph in place', function () {
+    $command = app(InstallCommand::class);
+
+    expect($command->withTokenableMorph('        $table->morphs(\'tokenable\');', 'uuidMorphs'))
+        ->toBe('        $table->uuidMorphs(\'tokenable\');')
+        ->and($command->withTokenableMorph('        $table->morphs("tokenable");', 'ulidMorphs'))
+        ->toBe('        $table->ulidMorphs("tokenable");')
+        ->and($command->withTokenableMorph('        $table->uuidMorphs(\'tokenable\');', 'ulidMorphs'))
+        ->toBe('        $table->uuidMorphs(\'tokenable\');')
+        ->and($command->withTokenableMorph('        $table->id();', 'uuidMorphs'))
+        ->toBeNull();
+});
+
+it('publishes a string tokenable morph for a string user key', function (string $imports, string $body, string $modifiers, string $method) {
+    skipWithoutSanctum();
+
+    $class = 'KeyedUser'.uniqid();
+    $path = $this->sandbox."/app/Models/{$class}.php";
+    File::put($path, <<<PHP
+    <?php
+
+    namespace Sandbox\\Models;
+
+    {$imports}
+    use Illuminate\\Foundation\\Auth\\User as Authenticatable;
+
+    {$modifiers}class {$class} extends Authenticatable
+    {
+        {$body}
+    }
+
+    PHP);
+    require $path;
+    config()->set('auth.providers.users.model', "Sandbox\\Models\\{$class}");
+
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
+        ->assertSuccessful();
+
+    $migrations = File::glob(database_path('migrations/*_create_personal_access_tokens_table.php'));
+    $migration = File::get($migrations[0]);
+
+    expect($migrations)->toHaveCount(1)
+        ->and($migration)->toContain("\$table->{$method}('tokenable');")
+        ->and($migration)->not->toMatch('/->morphs\s*\(\s*[\'"]tokenable[\'"]\)/')
+        ->and(File::get($path))->toContain('use HasApiTokens')
+        ->and(substr_count(File::get($path), 'HasApiTokens'))->toBe(2);
+
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
+        ->assertSuccessful();
+
+    expect(File::get($migrations[0]))->toBe($migration)
+        ->and(substr_count(File::get($path), 'HasApiTokens'))->toBe(2);
+})->with([
+    'HasUuids on a final class' => [
+        'use Illuminate\Database\Eloquent\Concerns\HasUuids;',
+        'use HasUuids;',
+        'final ',
+        'uuidMorphs',
+    ],
+    'HasUlids' => [
+        'use Illuminate\Database\Eloquent\Concerns\HasUlids;',
+        'use HasUlids;',
+        'final ',
+        'ulidMorphs',
+    ],
+    'string keyType' => [
+        '',
+        'protected $keyType = \'string\';',
+        'final ',
+        'uuidMorphs',
+    ],
+]);
+
+it('leaves an already published personal access tokens migration unchanged', function () {
+    skipWithoutSanctum();
+
+    $class = 'UuidUser'.uniqid();
+    $user = $this->sandbox."/app/Models/{$class}.php";
+    File::put($user, <<<PHP
+    <?php
+
+    namespace Sandbox\\Models;
+
+    use Illuminate\\Database\\Eloquent\\Concerns\\HasUuids;
+    use Illuminate\\Foundation\\Auth\\User as Authenticatable;
+
+    final class {$class} extends Authenticatable
+    {
+        use HasUuids;
+    }
+
+    PHP);
+    require $user;
+    config()->set('auth.providers.users.model', "Sandbox\\Models\\{$class}");
+
+    $path = database_path('migrations/2019_12_14_000001_create_personal_access_tokens_table.php');
+    File::ensureDirectoryExists(dirname($path));
+    $original = "<?php\n\n\$table->morphs('tokenable');\n";
+    File::put($path, $original);
+
+    $this->artisan('filament-mcp:install', ['--panel' => 'admin', '--no-migrate' => true])
+        ->assertSuccessful();
+
+    expect(File::get($path))->toBe($original)
+        ->and(File::glob(database_path('migrations/*_create_personal_access_tokens_table.php')))->toHaveCount(1);
 });

@@ -10,27 +10,17 @@ MCP for Laravel apps with a Filament panel. Users create Laravel Sanctum tokens 
 
 ## Installation
 
-Requires PHP 8.3+, Filament 4 or 5, and [Laravel MCP](https://github.com/laravel/mcp). Tokens use [Laravel Sanctum](https://github.com/laravel/sanctum) ^4 by default, which the app installs itself (`composer require laravel/sanctum`). To use [Laravel Passport](https://github.com/laravel/passport) instead, install Passport ^13, create a personal access client, and pass `--driver=passport`.
-
-Until the package is on Packagist, add the repository to your app's `composer.json`:
-
-```json
-"repositories": [
-    { "type": "vcs", "url": "https://github.com/TappNetwork/filament-mcp" }
-]
-```
-
-Then install it and run the install command:
+Requires PHP 8.3+, Filament 4 or 5, and [Laravel MCP](https://github.com/laravel/mcp). Tokens use [Laravel Sanctum](https://github.com/laravel/sanctum) ^4 by default. To use [Laravel Passport](https://github.com/laravel/passport) instead, install Passport ^13, create a personal access client, and pass `--driver=passport`.
 
 ```bash
-composer require laravel/sanctum tapp/filament-mcp:dev-main
+composer require laravel/sanctum tapp/filament-mcp
 php artisan filament-mcp:install
 ```
 
 For Passport ^13:
 
 ```bash
-composer require laravel/passport:^13.0 tapp/filament-mcp:dev-main
+composer require laravel/passport:^13.0 tapp/filament-mcp
 php artisan passport:client --personal
 php artisan filament-mcp:install --driver=passport
 ```
@@ -38,11 +28,13 @@ php artisan filament-mcp:install --driver=passport
 The install command:
 
 1. Publishes `config/filament-mcp.php`. With `--driver=passport`, it sets `auth.driver` to `passport` in that file.
-2. For Sanctum (the default): publishes and runs Sanctum's `personal_access_tokens` migration, unless it is already there. Pass `--no-migrate` to skip running it. Adds `Laravel\Sanctum\HasApiTokens` to your user model.
+2. For Sanctum (the default): publishes and runs Sanctum's `personal_access_tokens` migration, unless it is already there. Pass `--no-migrate` to skip running it. Adds `Laravel\Sanctum\HasApiTokens` to your user model, including a `final`, `readonly`, or `abstract` class and a class with attributes above it. A model that already uses the trait is left alone.
 3. For Passport: does not publish a migration or edit the user model. It tells you to add `Laravel\Passport\HasApiTokens` yourself, and it warns when `php artisan passport:client --personal` has not been run.
 4. Adds `FilamentMcpPlugin` to your panel. If the panel uses `SanctumPlugin` from devtical/filament-sanctum, it is replaced and that package can be removed. Pass `--panel=<id>` when you have more than one panel.
 
 You can run it again safely. It skips any step that's already done.
+
+Sanctum's published migration calls `morphs('tokenable')`. The default morph key type is an unsigned big integer, so a UUID or ULID user id cannot be saved in that column. When the command publishes the migration, it reads the user model and rewrites that call: `HasUlids` becomes `ulidMorphs('tokenable')`, and `HasUuids` or `protected $keyType = 'string'` becomes `uuidMorphs('tokenable')`. A string key without `HasUlids` uses `uuidMorphs` because that column holds a 36-character UUID, and a 26-character ULID fits in it. A string key longer than 36 characters needs a different column, so edit the migration before it runs. A migration that is already on disk is left as published. If that file still calls `morphs('tokenable')` and the user id is a UUID or ULID, change the call to `uuidMorphs('tokenable')` or `ulidMorphs('tokenable')` before migrating.
 
 To add the plugin yourself:
 
