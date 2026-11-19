@@ -41,8 +41,7 @@ describe('token form', function () {
             ->assertSchemaComponentExists('ability_groups.g0_general', 'mountedActionSchema0')
             ->assertSchemaComponentExists('ability_groups.g1_lms', 'mountedActionSchema0')
             ->assertSchemaComponentExists('ability_groups.g2_webhooks', 'mountedActionSchema0')
-            ->assertSee('LMS abilities')
-            ->assertDontSee('G1 lms');
+            ->assertSchemaComponentExists('ability_groups.g1_lms', 'mountedActionSchema0', fn ($field): bool => $field->getLabel() === 'LMS abilities');
     });
 
     it('saves the union of every group as one flat list', function () {
