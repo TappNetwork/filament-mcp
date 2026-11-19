@@ -8,6 +8,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -17,7 +18,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -28,6 +31,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
 use Tapp\FilamentMcp\Discovery\McpServerRegistry;
 use Tapp\FilamentMcp\FilamentMcpPlugin;
@@ -185,12 +189,12 @@ class McpTokens extends Page implements HasTable
                     ->icon('heroicon-o-pencil-square')
                     ->modalHeading(fn (Model $record): string => __('filament-mcp::tokens.edit_heading', ['name' => (string) $record->getAttribute('name')]))
                     ->modalDescription(__('filament-mcp::tokens.edit_description'))
-                    ->fillForm(fn (Model $record): array => [
-                        'abilities' => array_values(array_intersect($this->tokens()->abilities($record), array_keys($this->getAbilityOptions()))),
-                    ])
+                    ->fillForm(fn (Model $record): array => $this->fillAbilities(
+                        array_values(array_intersect($this->tokens()->abilities($record), array_keys($this->getAbilityOptions()))),
+                    ))
                     ->schema(fn (): array => [$this->getAbilitiesField()])
                     ->action(function (Model $record, array $data): void {
-                        $this->tokens()->updateAbilities($record, array_values($data['abilities'] ?? []));
+                        $this->tokens()->updateAbilities($record, $this->chosenAbilities($data));
 
                         Notification::make()
                             ->title(__('filament-mcp::tokens.updated'))
@@ -253,7 +257,7 @@ class McpTokens extends Page implements HasTable
                     $this->plainTextToken = $this->tokens()->issue(
                         $this->tokenOwner(),
                         $data['name'],
-                        array_values($data['abilities'] ?? []),
+                        $this->chosenAbilities($data),
                         $this->resolveExpiration($data),
                     );
 
@@ -322,7 +326,7 @@ class McpTokens extends Page implements HasTable
     }
 
     /**
-     * @return array<int, Component|TextInput|CheckboxList|DateTimePicker>
+     * @return array<int, Component|TextInput|DateTimePicker>
      */
     protected function getCreateTokenSchema(): array
     {
@@ -357,13 +361,145 @@ class McpTokens extends Page implements HasTable
         ];
     }
 
-    protected function getAbilitiesField(): CheckboxList
+    /**
+     * The ability options sectioned by group, with config extras last.
+     *
+     * @return array<string, array<string, string>> group => [ability => label]
+     */
+    protected function getGroupedAbilityOptions(): array
     {
-        return CheckboxList::make('abilities')
-            ->label(__('filament-mcp::tokens.abilities'))
-            ->options(fn (): array => $this->getAbilityOptions())
-            ->columns(static::setting('abilities.columns', 2))
-            ->bulkToggleable();
+        $grouped = app(McpServerRegistry::class)->groupedAbilities();
+        $extra = array_diff_key((array) static::setting('abilities.extra', []), array_merge(...array_values($grouped) ?: [[]]));
+
+        if ($extra !== []) {
+            $other = __('filament-mcp::tokens.other_group');
+            $grouped[$other] = ($grouped[$other] ?? []) + $extra;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * One flat list when there is a single group, otherwise a select-all
+     * followed by a section per group, each with its own select-all.
+     */
+    protected function getAbilitiesField(): Component
+    {
+        $groups = $this->getGroupedAbilityOptions();
+
+        if (count($groups) <= 1) {
+            return CheckboxList::make('abilities')
+                ->label(__('filament-mcp::tokens.abilities'))
+                ->options(fn (): array => $this->getAbilityOptions())
+                ->columns(static::setting('abilities.columns', 2))
+                ->bulkToggleable();
+        }
+
+        $keys = $this->groupKeys($groups);
+
+        $sections = [];
+
+        foreach ($groups as $group => $options) {
+            $key = $keys[$group];
+
+            $sections[] = Section::make(__('filament-mcp::tokens.group_abilities', ['group' => $group]))
+                ->compact()
+                ->schema([
+                    CheckboxList::make('ability_groups.'.$key)
+                        ->hiddenLabel()
+                        ->options($options)
+                        ->columns(static::setting('abilities.columns', 2))
+                        ->bulkToggleable()
+                        ->live()
+                        ->afterStateUpdated(fn (Get $get, Set $set) => $set('select_all_abilities', $this->allSelected($get('ability_groups') ?? [], $groups, $keys))),
+                ]);
+        }
+
+        return Grid::make(1)->extraAttributes(['data-ability-groups' => '1'])->schema([
+            Checkbox::make('select_all_abilities')
+                ->label(__('filament-mcp::tokens.select_all'))
+                ->live()
+                ->dehydrated(false)
+                ->afterStateUpdated(function (bool $state, Set $set) use ($groups, $keys): void {
+                    foreach ($groups as $group => $options) {
+                        $set('ability_groups.'.$keys[$group], $state ? array_keys($options) : []);
+                    }
+                }),
+            ...$sections,
+        ]);
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $state
+     * @param  array<string, array<string, string>>  $groups
+     * @param  array<string, string>  $keys
+     */
+    protected function allSelected(array $state, array $groups, array $keys): bool
+    {
+        foreach ($groups as $group => $options) {
+            if (array_diff(array_keys($options), (array) ($state[$keys[$group]] ?? [])) !== []) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $groups
+     * @return array<string, string> group => form state key
+     */
+    protected function groupKeys(array $groups): array
+    {
+        $keys = [];
+
+        foreach (array_keys($groups) as $index => $group) {
+            $keys[$group] = 'g'.$index.'_'.Str::slug($group, '_');
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Form state for the chosen abilities, split per group when the form is grouped.
+     *
+     * @param  array<int, string>  $abilities
+     * @return array<string, mixed>
+     */
+    protected function fillAbilities(array $abilities): array
+    {
+        $groups = $this->getGroupedAbilityOptions();
+
+        if (count($groups) <= 1) {
+            return ['abilities' => $abilities];
+        }
+
+        $keys = $this->groupKeys($groups);
+        $state = [];
+
+        foreach ($groups as $group => $options) {
+            $state[$keys[$group]] = array_values(array_intersect(array_keys($options), $abilities));
+        }
+
+        return [
+            'ability_groups' => $state,
+            'select_all_abilities' => $this->allSelected($state, $groups, $keys),
+        ];
+    }
+
+    /**
+     * The flat ability list from the submitted form, grouped or not.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, string>
+     */
+    protected function chosenAbilities(array $data): array
+    {
+        if (isset($data['ability_groups'])) {
+            return array_values(array_unique(array_merge(...array_values(array_map(array_values(...), (array) $data['ability_groups'])) ?: [[]])));
+        }
+
+        return array_values($data['abilities'] ?? []);
     }
 
     /**

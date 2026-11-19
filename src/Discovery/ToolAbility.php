@@ -6,9 +6,12 @@ use Illuminate\Support\Str;
 use Laravel\Mcp\Server\Tool;
 use ReflectionClass;
 use Tapp\FilamentMcp\Attributes\Ability;
+use Tapp\FilamentMcp\Attributes\AbilityGroup;
 
 final class ToolAbility
 {
+    public const DEFAULT_GROUP = 'General';
+
     /**
      * The Sanctum ability a token needs to call the tool.
      */
@@ -36,6 +39,16 @@ final class ToolAbility
     public static function declaredLabel(Tool $tool): ?string
     {
         return self::attribute($tool)?->label;
+    }
+
+    /**
+     * The group the tool's #[AbilityGroup] declares, else "General".
+     */
+    public static function group(Tool $tool): string
+    {
+        $attributes = (new ReflectionClass($tool))->getAttributes(AbilityGroup::class);
+
+        return $attributes === [] ? self::DEFAULT_GROUP : $attributes[0]->newInstance()->name;
     }
 
     private static function attribute(Tool $tool): ?Ability

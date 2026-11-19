@@ -118,6 +118,22 @@ class RenameReport extends Tool
 
 The token form then offers one "Manage reports" checkbox for both tools. The label only needs to be on one tool in the group. Without one, the label is the ability name in headline case. Groups also let existing tokens keep working after you rename or split a tool.
 
+### Sections in the token form
+
+Tag a tool with `AbilityGroup` to list its ability under a named section of the token form. Each section has its own "select all", and a "Select all" at the top covers every section:
+
+```php
+use Tapp\FilamentMcp\Attributes\AbilityGroup;
+
+#[AbilityGroup('LMS')]
+class CreateCourse extends Tool
+{
+    // ...
+}
+```
+
+Tools without the attribute go under "General", and abilities from `abilities.extra` under "Other". When every ability falls in one section, the form shows a single flat list as before. Sections only change the form; tokens still store a flat list of abilities.
+
 Tokens created without abilities (`['*']`) can call every tool. A first-party Sanctum request is let through, because the `auth:sanctum` guard attaches a transient token that can call every tool. A signed-in user with no access token, including a session on `auth:web`, is refused.
 
 For servers that use `ToolSearch`, each tool that `execute_tools` runs is checked against its own ability. `search_tools` and `execute_tools` stay listed, and `search_tools` can still name tools the token isn't allowed to run.

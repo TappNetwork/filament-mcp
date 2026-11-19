@@ -4,6 +4,8 @@ All notable changes to `filament-mcp` will be documented in this file.
 
 ## Unreleased
 
+- Group the token form's abilities into sections. Tag a tool with `#[AbilityGroup('LMS')]` and its ability appears under "LMS abilities" with its own select-all, below a select-all for everything. Untagged tools fall under "General" and `abilities.extra` under "Other". One section renders a flat list as before. `McpServer` and `McpServerRegistry` gain `groupedAbilities()`; `abilities()` is unchanged.
+
 - The install command adds `HasApiTokens` to `final`, `readonly`, and `abstract` user models, including attributes above the class. A newly published Sanctum migration uses `uuidMorphs` or `ulidMorphs` when the user key is a UUID, a ULID, or a string. Install steps require the package from Packagist.
 
 - Opt-in manage-all for MCP tokens via `FilamentMcpPlugin::canManageAllTokens()` so allowed users see every token (with an Owner column) and can edit or revoke them. Creating a token still issues it for the signed-in user. `FilamentMcpPlugin::canAccess()` limits who can open the page, falling back to `authorization.gate` when unset. `IssuesMcpTokens` gains `allTokensQuery()` and `owner()`.

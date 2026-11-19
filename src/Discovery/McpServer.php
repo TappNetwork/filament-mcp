@@ -50,4 +50,30 @@ final class McpServer
 
         return $abilities;
     }
+
+    /**
+     * The same abilities as abilities(), sectioned by each tool's group.
+     * An ability shared by tools in different groups stays in the first.
+     *
+     * @return array<string, array<string, string>> group => [ability => label]
+     */
+    public function groupedAbilities(): array
+    {
+        $labels = $this->abilities();
+        $grouped = [];
+        $placed = [];
+
+        foreach ($this->tools as $tool) {
+            $ability = ToolAbility::for($tool);
+
+            if (isset($placed[$ability])) {
+                continue;
+            }
+
+            $placed[$ability] = true;
+            $grouped[ToolAbility::group($tool)][$ability] = $labels[$ability];
+        }
+
+        return $grouped;
+    }
 }
