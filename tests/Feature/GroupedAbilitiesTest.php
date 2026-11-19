@@ -14,8 +14,8 @@ it('groups abilities by declared group with General as the fallback', function (
     $registry = app(McpServerRegistry::class);
 
     expect($registry->find('Grouped')->groupedAbilities())->toBe([
-        'LMS' => ['create_course' => 'Create Course'],
-        'Webhooks' => ['create_webhook_event' => 'Create Webhook Event'],
+        'LMS' => ['create_course' => 'Create Course', 'create_lesson' => 'Create Lesson'],
+        'Webhooks' => ['create_webhook_event' => 'Create Webhook Event', 'delete_webhook_event' => 'Delete Webhook Event'],
         'General' => ['list_lessons' => 'List Lessons'],
     ])->and($registry->groupedAbilities())->toHaveKeys(['LMS', 'Webhooks', 'General'])
         ->and($registry->abilities())->toHaveKeys(['create_course', 'create_webhook_event', 'list_lessons']);
