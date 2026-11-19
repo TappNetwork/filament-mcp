@@ -69,6 +69,30 @@ class McpServerRegistry
         return $abilities;
     }
 
+    /**
+     * Every tool ability across the servers, sectioned by group. First label wins.
+     *
+     * @return array<string, array<string, string>> group => [ability => label]
+     */
+    public function groupedAbilities(): array
+    {
+        $grouped = [];
+        $seen = [];
+
+        foreach ($this->servers() as $server) {
+            foreach ($server->groupedAbilities() as $group => $abilities) {
+                foreach ($abilities as $ability => $label) {
+                    if (! isset($seen[$ability])) {
+                        $seen[$ability] = true;
+                        $grouped[$group][$ability] = $label;
+                    }
+                }
+            }
+        }
+
+        return $grouped;
+    }
+
     public function flush(): void
     {
         $this->servers = null;

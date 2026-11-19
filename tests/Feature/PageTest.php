@@ -51,6 +51,7 @@ it('falls back to the bare token when no MCP server uses Sanctum', function () {
     $this->mock(McpServerRegistry::class, function ($mock) {
         $mock->shouldReceive('servers')->andReturn([]);
         $mock->shouldReceive('abilities')->andReturn([]);
+        $mock->shouldReceive('groupedAbilities')->andReturn([]);
     });
 
     livewire(McpTokens::class)
