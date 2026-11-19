@@ -40,7 +40,9 @@ describe('token form', function () {
             ->assertSchemaComponentExists('select_all_abilities', 'mountedActionSchema0')
             ->assertSchemaComponentExists('ability_groups.g0_general', 'mountedActionSchema0')
             ->assertSchemaComponentExists('ability_groups.g1_lms', 'mountedActionSchema0')
-            ->assertSchemaComponentExists('ability_groups.g2_webhooks', 'mountedActionSchema0');
+            ->assertSchemaComponentExists('ability_groups.g2_webhooks', 'mountedActionSchema0')
+            ->assertSee('LMS abilities')
+            ->assertDontSee('G1 lms');
     });
 
     it('saves the union of every group as one flat list', function () {

@@ -27,10 +27,25 @@ final class ToolAbility
         $attribute = self::attribute($tool);
 
         if ($attribute === null) {
-            return $tool->title();
+            return self::title($tool);
         }
 
         return $attribute->label ?? Str::headline($attribute->name);
+    }
+
+    /**
+     * The tool's title, without the " Tool" that a class name like
+     * ListSitesTool adds when no title is declared.
+     */
+    private static function title(Tool $tool): string
+    {
+        $title = $tool->title();
+
+        if ($title === Str::headline(class_basename($tool)) && Str::endsWith($title, ' Tool')) {
+            return Str::beforeLast($title, ' Tool');
+        }
+
+        return $title;
     }
 
     /**

@@ -401,11 +401,13 @@ class McpTokens extends Page implements HasTable
 
         foreach ($groups as $group => $options) {
             $key = $keys[$group];
+            $heading = __('filament-mcp::tokens.group_abilities', ['group' => $group]);
 
-            $sections[] = Section::make(__('filament-mcp::tokens.group_abilities', ['group' => $group]))
+            $sections[] = Section::make($heading)
                 ->compact()
                 ->schema([
                     CheckboxList::make('ability_groups.'.$key)
+                        ->label($heading)
                         ->hiddenLabel()
                         ->options($options)
                         ->columns(static::setting('abilities.columns', 2))
